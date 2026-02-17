@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/oslokommune/reusable-terraform-pr-plan/compare/v1.2.0...v1.2.1) (2026-02-17)
+
+
+### Dependency Updates
+
+* update determine-stacks to v1.1.2 ([#11](https://github.com/oslokommune/reusable-terraform-pr-plan/issues/11)) ([0665961](https://github.com/oslokommune/reusable-terraform-pr-plan/commit/0665961a145816bd4520f6ae69fb754d26af54c1))
+
 ## [1.2.0](https://github.com/oslokommune/reusable-terraform-pr-plan/compare/v1.1.0...v1.2.0) (2026-01-29)
 
 
