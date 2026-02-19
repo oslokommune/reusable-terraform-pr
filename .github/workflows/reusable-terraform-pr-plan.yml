@@ -17,6 +17,16 @@ on:
         default: ""
         description: "Comma/newline-delimited list of stack patterns to always ignore."
         required: false
+      pr-automerge:
+        type: boolean
+        default: false
+        description: "Whether to add an automerge label to the PR. Use an expression to control which PRs are eligible."
+        required: false
+      pr-automerge-rules:
+        type: string
+        default: "{}"
+        description: "Only used when pr-automerge is enabled. JSON object mapping update types (major/minor/patch) to: 'never', 'no-changes', or 'any-changes'. Unspecified types default to 'no-changes'."
+        required: false
     secrets:
       ssh-private-key:
         description: "A deploy key that grants read access to Terraform modules in golden-path-iac"
@@ -558,3 +568,74 @@ jobs:
           comment-id: ${{ steps.fc.outputs.comment-id }}
           body-file: ${{ steps.summary.outputs.file }}
           edit-mode: replace
+
+  automerge:
+    name: Automerge
+    if: >-
+      ${{
+        github.event_name == 'pull_request'
+        && github.event.pull_request.user.login == 'kjoremiljo-renovate[bot]'
+        && contains(github.event.pull_request.labels.*.name, 'Golden Path 👑')
+      }}
+    needs:
+      - summarize
+    permissions:
+      pull-requests: write
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Set automerge label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTOMERGE: ${{ inputs.pr-automerge }}
+          PR_AUTOMERGE_RULES: ${{ inputs.pr-automerge-rules }}
+          SUCCESS: ${{ needs.summarize.outputs.success }}
+          HAS_CHANGES: ${{ needs.summarize.outputs.has-changes }}
+          HAS_MAJOR_UPDATE: ${{ contains(github.event.pull_request.labels.*.name, 'Major update ⚠️') }}
+          HAS_MINOR_UPDATE: ${{ contains(github.event.pull_request.labels.*.name, 'Minor update ✨') }}
+          HAS_PATCH_UPDATE: ${{ contains(github.event.pull_request.labels.*.name, 'Patch update 🔧') }}
+        run: |
+          automerge="false"
+
+          # Evaluate rules only if automerge is enabled and plans succeeded
+          if [ "$PR_AUTOMERGE" = "true" ] && [ "$SUCCESS" = "true" ]; then
+            for type in major minor patch; do
+              case "$type" in
+                major) has_label="$HAS_MAJOR_UPDATE" ;;
+                minor) has_label="$HAS_MINOR_UPDATE" ;;
+                patch) has_label="$HAS_PATCH_UPDATE" ;;
+              esac
+
+              # We only evaluate rules if the PR contains a matching update
+              if [ "$has_label" = "true" ]; then
+                # Check if user has defined a rule for the current update type. Default rule is 'no-changes'.
+                rule="$(echo "$PR_AUTOMERGE_RULES" | jq -r --arg type "$type" '.[$type] // "no-changes"')"
+
+                # Rule 'any-changes' allows automerge regardless of plan changes
+                if [ "$rule" = "any-changes" ]; then
+                  automerge="true"
+                # Rule 'no-changes' allows automerge only if plans have no changes
+                elif [ "$rule" = "no-changes" ] && [ "$HAS_CHANGES" != "true" ]; then
+                  automerge="true"
+                # Rule 'never' blocks automerge for this update type
+                elif [ "$rule" = "never" ]; then
+                  automerge="false"
+                  break
+                # Rule 'no-changes' with changes blocks automerge
+                elif [ "$rule" = "no-changes" ] && [ "$HAS_CHANGES" = "true" ]; then
+                  automerge="false"
+                  break
+                fi
+              fi
+            done
+          fi
+
+          # Label needs to exist in repository before trying to attach it to a PR
+          gh label create --force --color "0E8A16" --description "Renovate will merge PRs with this label automatically" "automerge"
+          if [ "$automerge" = "true" ]; then
+            gh pr edit "$PR_NUMBER" --add-label "automerge"
+          else
+            # If we can't automerge, remove any existing (and outdated) label
+            gh pr edit "$PR_NUMBER" --remove-label "automerge"
+          fi
