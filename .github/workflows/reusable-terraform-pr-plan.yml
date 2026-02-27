@@ -20,12 +20,12 @@ on:
       pr-automerge:
         type: boolean
         default: false
-        description: "Whether to add an automerge label to the PR. Use an expression to control which PRs are eligible."
+        description: "Whether to evaluate Renovate PRs for automerge eligibility based on upgrade type and Terraform plan results."
         required: false
       pr-automerge-rules:
         type: string
-        default: "{}"
-        description: "Only used when pr-automerge is enabled. JSON object mapping update types (major/minor/patch) to: 'never', 'no-changes', or 'any-changes'. Unspecified types default to 'no-changes'."
+        default: "[]"
+        description: "Only used when pr-automerge is enabled. JSON array of rules with pattern matching and per-update-type policies. Each rule: {pattern, major?, minor?, patch?}. Policies: 'never', 'no-changes', 'any-changes'. First matching pattern wins. Unspecified types default to 'no-changes'."
         required: false
     secrets:
       ssh-private-key:
@@ -458,6 +458,7 @@ jobs:
     outputs:
       success: ${{ steps.summary.outputs.success == 'true' }}
       has-changes: ${{ steps.summary.outputs.has-changes == 'true' }}
+      stack-changes: ${{ steps.summary.outputs.stack-changes }}
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
@@ -495,6 +496,9 @@ jobs:
 
           success="true"
           has_changes="false"
+          # Per-stack change map, e.g. {"stacks/dev/app": true, "stacks/prod/app": false}.
+          # Used by automerge evaluation to check policies per stack.
+          stack_changes="{}"
 
           for summary_file in summaries/*.json; do
             emoji="❌"
@@ -504,7 +508,9 @@ jobs:
 
             if "$(jq -e '.jobStatus == "success"' "$summary_file")"; then
               emoji="🟩"
-              if "$(jq -e '.hasChanges' "$summary_file")"; then
+              stack_has_changes="$(jq -r '.hasChanges' "$summary_file")"
+              stack_changes="$(echo "$stack_changes" | jq -c --arg stack "$stack" --argjson changes "$stack_has_changes" '. + {($stack): $changes}')"
+              if "$stack_has_changes"; then
                 emoji="🟧"
                 has_changes="true"
               fi
@@ -544,6 +550,7 @@ jobs:
           echo "file=/tmp/summary.md" >> "$GITHUB_OUTPUT"
           echo "success=$success" >> "$GITHUB_OUTPUT"
           echo "has-changes=$has_changes" >> "$GITHUB_OUTPUT"
+          echo "stack-changes=$stack_changes" >> "$GITHUB_OUTPUT"
 
       - name: Write to job summary
         if: ${{ github.event_name != 'pull_request' }}
@@ -575,65 +582,41 @@ jobs:
       ${{
         github.event_name == 'pull_request'
         && github.event.pull_request.user.login == 'kjoremiljo-renovate[bot]'
-        && contains(github.event.pull_request.labels.*.name, 'Golden Path 👑')
       }}
     needs:
       - summarize
     permissions:
+      contents: read
       pull-requests: write
     runs-on: ubuntu-24.04
     steps:
+      - name: Evaluate automerge
+        id: evaluate
+        # We only do the automerge evaluation if the automerge functionality is enabled,
+        # rules are set, all Terraform plans succeeded, and the PR only contains one commit
+        if: >-
+          ${{
+            inputs.pr-automerge
+            && inputs.pr-automerge-rules != '[]'
+            && needs.summarize.outputs.success == 'true'
+            && github.event.pull_request.commits == 1
+          }}
+        uses: oslokommune/composite-actions/evaluate-automerge@c9b0d18bb0b2a0bba166e631403b350549cd6d64 # evaluate-automerge-v1.0.0
+        with:
+          rules: ${{ inputs.pr-automerge-rules }}
+          stack-changes: ${{ needs.summarize.outputs.stack-changes }}
+
       - name: Set automerge label
+        if: ${{ always() }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_AUTOMERGE: ${{ inputs.pr-automerge }}
-          PR_AUTOMERGE_RULES: ${{ inputs.pr-automerge-rules }}
-          SUCCESS: ${{ needs.summarize.outputs.success }}
-          HAS_CHANGES: ${{ needs.summarize.outputs.has-changes }}
-          HAS_MAJOR_UPDATE: ${{ contains(github.event.pull_request.labels.*.name, 'Major update ⚠️') }}
-          HAS_MINOR_UPDATE: ${{ contains(github.event.pull_request.labels.*.name, 'Minor update ✨') }}
-          HAS_PATCH_UPDATE: ${{ contains(github.event.pull_request.labels.*.name, 'Patch update 🔧') }}
+          AUTOMERGE: ${{ steps.evaluate.outputs.automerge }}
         run: |
-          automerge="false"
-
-          # Evaluate rules only if automerge is enabled and plans succeeded
-          if [ "$PR_AUTOMERGE" = "true" ] && [ "$SUCCESS" = "true" ]; then
-            for type in major minor patch; do
-              case "$type" in
-                major) has_label="$HAS_MAJOR_UPDATE" ;;
-                minor) has_label="$HAS_MINOR_UPDATE" ;;
-                patch) has_label="$HAS_PATCH_UPDATE" ;;
-              esac
-
-              # We only evaluate rules if the PR contains a matching update
-              if [ "$has_label" = "true" ]; then
-                # Check if user has defined a rule for the current update type. Default rule is 'no-changes'.
-                rule="$(echo "$PR_AUTOMERGE_RULES" | jq -r --arg type "$type" '.[$type] // "no-changes"')"
-
-                # Rule 'any-changes' allows automerge regardless of plan changes
-                if [ "$rule" = "any-changes" ]; then
-                  automerge="true"
-                # Rule 'no-changes' allows automerge only if plans have no changes
-                elif [ "$rule" = "no-changes" ] && [ "$HAS_CHANGES" != "true" ]; then
-                  automerge="true"
-                # Rule 'never' blocks automerge for this update type
-                elif [ "$rule" = "never" ]; then
-                  automerge="false"
-                  break
-                # Rule 'no-changes' with changes blocks automerge
-                elif [ "$rule" = "no-changes" ] && [ "$HAS_CHANGES" = "true" ]; then
-                  automerge="false"
-                  break
-                fi
-              fi
-            done
-          fi
-
           # Label needs to exist in repository before trying to attach it to a PR
           gh label create --force --color "0E8A16" --description "Renovate will merge PRs with this label automatically" "automerge"
-          if [ "$automerge" = "true" ]; then
+          if [ "$AUTOMERGE" = "true" ]; then
             gh pr edit "$PR_NUMBER" --add-label "automerge"
           else
             # If we can't automerge, remove any existing (and outdated) label
