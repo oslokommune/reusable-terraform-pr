@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/oslokommune/reusable-terraform-pr-plan/compare/v1.3.0...v1.4.0) (2026-02-27)
+
+
+### Features
+
+* more flexible automerge rules ([#25](https://github.com/oslokommune/reusable-terraform-pr-plan/issues/25)) ([f896855](https://github.com/oslokommune/reusable-terraform-pr-plan/commit/f896855d80f7207faaa55d87c7f21b105b5b98f8))
+
 ## [1.3.0](https://github.com/oslokommune/reusable-terraform-pr-plan/compare/v1.2.1...v1.3.0) (2026-02-19)
 
 
