@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2](https://github.com/oslokommune/reusable-terraform-pr-plan/compare/v1.4.1...v1.4.2) (2026-03-04)
+
+
+### Bug Fixes
+
+* update determine-stacks to v1.1.4 ([#30](https://github.com/oslokommune/reusable-terraform-pr-plan/issues/30)) ([04db135](https://github.com/oslokommune/reusable-terraform-pr-plan/commit/04db135d7b1b5e7df74953dbc729490e25868254))
+
 ## [1.4.1](https://github.com/oslokommune/reusable-terraform-pr-plan/compare/v1.4.0...v1.4.1) (2026-03-03)
 
 
