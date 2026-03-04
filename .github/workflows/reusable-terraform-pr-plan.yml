@@ -102,7 +102,7 @@ jobs:
 
       - name: Determine changed stacks
         id: determine
-        uses: oslokommune/composite-actions/determine-stacks@e4a52c90b079620c92e671cd9a71381765a6850f # determine-stacks-v1.1.2
+        uses: oslokommune/composite-actions/determine-stacks@f4c5d5d181abc4b0af2eaa816369d7deb2a04807 # determine-stacks-v1.1.4
         with:
           selected-stacks: ${{ inputs.selected-stacks }}
           ignored-stacks: ${{ inputs.ignored-stacks }}
