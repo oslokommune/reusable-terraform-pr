@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/oslokommune/reusable-terraform-pr-plan/compare/v1.4.0...v1.4.1) (2026-03-03)
+
+
+### Bug Fixes
+
+* Do not trigger on issue comments ([#27](https://github.com/oslokommune/reusable-terraform-pr-plan/issues/27)) ([165ce08](https://github.com/oslokommune/reusable-terraform-pr-plan/commit/165ce08be63e7d34497bc77b8ad3b048be13bed9))
+
 ## [1.4.0](https://github.com/oslokommune/reusable-terraform-pr-plan/compare/v1.3.0...v1.4.0) (2026-02-27)
 
 
