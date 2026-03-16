@@ -1,4 +1,4 @@
-# reusable-terraform-pr-plan
+# reusable-terraform-pr
 
 Reusable GitHub Actions workflow for running Terraform plan on pull requests.
 
@@ -16,7 +16,7 @@ on:
 
 jobs:
   plan:
-    uses: oslokommune/reusable-terraform-pr-plan/.github/workflows/reusable-terraform-pr-plan.yml@v1
+    uses: oslokommune/reusable-terraform-pr/.github/workflows/reusable-terraform-pr.yml@v1
     secrets:
       ssh-private-key: ${{ secrets.GOLDEN_PATH_IAC_PRIVATE_DEPLOY_KEY }}
 ```
@@ -41,7 +41,7 @@ on:
 
 jobs:
   plan:
-    uses: oslokommune/reusable-terraform-pr-plan/.github/workflows/reusable-terraform-pr-plan.yml@v1
+    uses: oslokommune/reusable-terraform-pr/.github/workflows/reusable-terraform-pr.yml@v1
     with:
       selected-stacks: ${{ inputs.selected-stacks }}
     secrets:
@@ -69,7 +69,7 @@ on:
 
 jobs:
   plan:
-    uses: oslokommune/reusable-terraform-pr-plan/.github/workflows/reusable-terraform-pr-plan.yml@v1
+    uses: oslokommune/reusable-terraform-pr/.github/workflows/reusable-terraform-pr.yml@v1
     with:
       pr-automerge: true
       pr-automerge-rules: |

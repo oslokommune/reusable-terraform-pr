@@ -1,4 +1,4 @@
-name: "Terraform PR plan"
+name: "Terraform PR"
 
 on:
   workflow_call:
