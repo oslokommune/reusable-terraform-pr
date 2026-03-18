@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.3](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.4.2...v1.4.3) (2026-03-18)
+
+
+### Bug Fixes
+
+* trigger release ([2f78c6c](https://github.com/oslokommune/reusable-terraform-pr/commit/2f78c6c5d5d3371a51ddbf0368e96b10a23e836a))
+
 ## [1.4.2](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.4.1...v1.4.2) (2026-03-04)
 
 
