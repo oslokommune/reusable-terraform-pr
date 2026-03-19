@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.4](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.4.3...v1.4.4) (2026-03-19)
+
+
+### Dependency Updates
+
+* update determine stacks to v1.2.1 ([d0a9407](https://github.com/oslokommune/reusable-terraform-pr/commit/d0a94072e1818ed17ea98994eafcd1b0cd9b46d3))
+
 ## [1.4.3](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.4.2...v1.4.3) (2026-03-18)
 
 
