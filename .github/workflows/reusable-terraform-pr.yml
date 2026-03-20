@@ -42,6 +42,18 @@ on:
         description: "JSON array of all stacks that were planned"
         value: ${{ jobs.determine-changed-stacks.outputs.all-stacks }}
 
+# NOTE: Prevent concurrent runs for the same PR from causing a race condition on PR comments.
+# Concurrent runs will find and write to the same comments, and this can result in
+# a mix of comments from different runs - the summary can show a
+# failure while the individual plan comment shows success, or vice versa.
+concurrency:
+  # We only enable concurrency control for pull request events. Runs triggered
+  # through workflow dispatch can run in parallel as they don't affect each other.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  # We cancel in-progress concurrent runs immediately to get quicker feedback
+  # and since the old plans are outdated anyway.
+  cancel-in-progress: true
+
 defaults:
   run:
     shell: bash --noprofile --norc -euo pipefail {0}
