@@ -581,10 +581,6 @@ jobs:
           edit-mode: replace
 
       - name: Fail if any plan failed
-        if: >-
-          ${{
-            github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
-          }}
         env:
           PLAN_SUCCESS: ${{ steps.summary.outputs.success }}
         run: |
