@@ -21,6 +21,16 @@ jobs:
       ssh-private-key: ${{ secrets.GOLDEN_PATH_IAC_PRIVATE_DEPLOY_KEY }}
 ```
 
+### Multiple SSH private keys
+
+```yaml
+    secrets:
+      ssh-private-key: |
+        ${{ secrets.GOLDEN_PATH_IAC_PRIVATE_DEPLOY_KEY }}
+        ${{ secrets.SOME_OTHER_DEPLOY_KEY }}
+```
+
+
 ### Inputs
 
 | Name                 | Type    | Default         | Description                                                                                                                                                        |

@@ -29,7 +29,7 @@ on:
         required: false
     secrets:
       ssh-private-key:
-        description: "A deploy key that grants read access to Terraform modules in golden-path-iac"
+        description: "One or more deploy keys that grants read access to neccesary repositories, e.g. Terraform modules in golden-path-iac"
         required: true
     outputs:
       success:
@@ -241,7 +241,7 @@ jobs:
               || fromJSON(steps.config.outputs.result).dev.planRoleArn
             }}
 
-      - name: Load golden-path-iac SSH deploy key
+      - name: Load SSH deploy key(s)
         uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.1
         with:
           ssh-private-key: ${{ secrets.ssh-private-key }}
