@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.0](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.4.4...v1.5.0) (2026-04-13)
+
+
+### Features
+
+* document supporting multiple keys ([#18](https://github.com/oslokommune/reusable-terraform-pr/issues/18)) ([20f5bc8](https://github.com/oslokommune/reusable-terraform-pr/commit/20f5bc8f5764c80d6176fda55b92977dc280f660))
+
+
+### Bug Fixes
+
+* Fail summarize job if any plan fails ([#16](https://github.com/oslokommune/reusable-terraform-pr/issues/16)) ([d9cf015](https://github.com/oslokommune/reusable-terraform-pr/commit/d9cf015130f9b9db503a1d91badd9ae2f189f30f))
+
 ## [1.4.4](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.4.3...v1.4.4) (2026-03-19)
 
 
