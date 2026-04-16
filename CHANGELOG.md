@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.5.0...v1.5.1) (2026-04-16)
+
+
+### Bug Fixes
+
+* add concurrency group to prevent race condition on PR comments ([#10](https://github.com/oslokommune/reusable-terraform-pr/issues/10)) ([f98ef59](https://github.com/oslokommune/reusable-terraform-pr/commit/f98ef59cf848a4a1d2f47c4d47ce00470960915a))
+
 ## [1.5.0](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.4.4...v1.5.0) (2026-04-13)
 
 
