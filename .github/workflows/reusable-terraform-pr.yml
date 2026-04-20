@@ -114,7 +114,7 @@ jobs:
 
       - name: Determine changed stacks
         id: determine
-        uses: oslokommune/composite-actions/determine-stacks@9a741809809645ca40db41897995721dd9941334 # determine-stacks-v1.2.1
+        uses: oslokommune/composite-actions/determine-stacks@a050629d84616b1428f802f674a2fd41c3e8b68a # determine-stacks-v1.2.2
         with:
           selected-stacks: ${{ inputs.selected-stacks }}
           ignored-stacks: ${{ inputs.ignored-stacks }}
@@ -273,7 +273,7 @@ jobs:
 
       - name: Configure Terraform cache
         id: cache-tf
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: ${{ env.TF_PLUGIN_CACHE_DIR }}
           key: ${{ runner.os }}-terraform-${{ hashFiles(format('{0}/.terraform.lock.hcl', matrix.stack)) }}
@@ -626,7 +626,7 @@ jobs:
             && needs.summarize.outputs.success == 'true'
             && github.event.pull_request.commits == 1
           }}
-        uses: oslokommune/composite-actions/evaluate-automerge@c9b0d18bb0b2a0bba166e631403b350549cd6d64 # evaluate-automerge-v1.0.0
+        uses: oslokommune/composite-actions/evaluate-automerge@a050629d84616b1428f802f674a2fd41c3e8b68a # evaluate-automerge-v1.0.1
         with:
           rules: ${{ inputs.pr-automerge-rules }}
           stack-changes: ${{ needs.summarize.outputs.stack-changes }}
