@@ -1,14 +1,14 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "github>oslokommune/golden-path-renovate:default.json5"
+    "github>oslokommune/golden-path-renovate:default.json5",
+    "github>oslokommune/golden-path-renovate:golden-path-v2.json5"
   ],
   "prConcurrentLimit": 10,
   "packageRules": [
-    // We use deps instead of chore(deps) for dependency updates
-    // we want to include in the changelog.
+    // Use deps prefix so dependency updates are included in changelogs
     {
-      "matchFileNames": [".github/workflows/reusable-*.yml"],
+      "matchPackageNames": ["*"],
       "semanticCommitType": "deps",
       "semanticCommitScope": null
     }
