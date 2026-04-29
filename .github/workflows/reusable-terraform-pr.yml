@@ -110,7 +110,7 @@ jobs:
       # determine-stacks requires code to be checked out in order to
       # find changed files
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Determine changed stacks
         id: determine
@@ -226,7 +226,7 @@ jobs:
       statuses: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Store config as output
         id: config
@@ -273,7 +273,7 @@ jobs:
 
       - name: Configure Terraform cache
         id: cache-tf
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: ${{ env.TF_PLUGIN_CACHE_DIR }}
           key: ${{ runner.os }}-terraform-${{ hashFiles(format('{0}/.terraform.lock.hcl', matrix.stack)) }}
