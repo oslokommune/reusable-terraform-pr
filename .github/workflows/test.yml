@@ -78,6 +78,8 @@ jobs:
             --artifact-server-path /tmp/act-artifacts \
             --env "GITHUB_API_URL=http://${MOCK_HOST}:8080" \
             --env "GH_HOST=${MOCK_HOST}:8080" \
+            --env "GITHUB_REPOSITORY=act-test/act-test-fixture" \
+            --env "GITHUB_REPOSITORY_OWNER=act-test" \
             --env "AWS_ENDPOINT_URL=http://${MOCK_HOST}:5000" \
             --env "AWS_ACCESS_KEY_ID=testing" \
             --env "AWS_SECRET_ACCESS_KEY=testing" \
