@@ -1,0 +1,13 @@
+name: test-caller
+
+on:
+  pull_request:
+
+jobs:
+  call:
+    uses: ./.github/workflows/reusable-terraform-pr.yml
+    with:
+      selected-stacks: testdata/stacks/null-stack
+      config-file: testdata/.gp.cicd.json
+    secrets:
+      ssh-private-key: dummy

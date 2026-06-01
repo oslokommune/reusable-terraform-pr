@@ -1,0 +1,30 @@
+{
+  "action": "synchronize",
+  "number": 1,
+  "pull_request": {
+    "number": 1,
+    "head": {
+      "ref": "test-branch",
+      "sha": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+    },
+    "base": {
+      "ref": "main",
+      "sha": "cafebabecafebabecafebabecafebabecafebabe"
+    },
+    "user": {
+      "login": "test-user"
+    },
+    "commits": 1
+  },
+  "repository": {
+    "name": "reusable-terraform-pr",
+    "full_name": "oslokommune/reusable-terraform-pr",
+    "owner": {
+      "login": "oslokommune"
+    },
+    "default_branch": "main"
+  },
+  "sender": {
+    "login": "test-user"
+  }
+}
