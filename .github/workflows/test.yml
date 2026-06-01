@@ -59,6 +59,7 @@ jobs:
             -W testdata/test-caller.yml \
             -e testdata/events/pull_request.json \
             --platform ubuntu-latest="${ACT_PLATFORM_IMAGE}" \
+            --platform ubuntu-24.04="${ACT_PLATFORM_IMAGE}" \
             --container-options "--add-host=host.docker.internal:host-gateway" \
             --artifact-server-path /tmp/act-artifacts \
             --env "GITHUB_API_URL=http://${MOCK_HOST}:8080" \
