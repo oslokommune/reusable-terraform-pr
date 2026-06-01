@@ -17,10 +17,10 @@
     "commits": 1
   },
   "repository": {
-    "name": "reusable-terraform-pr",
-    "full_name": "oslokommune/reusable-terraform-pr",
+    "name": "act-test-fixture",
+    "full_name": "act-test/act-test-fixture",
     "owner": {
-      "login": "oslokommune"
+      "login": "act-test"
     },
     "default_branch": "main"
   },

@@ -53,6 +53,12 @@ jobs:
       - name: Run reusable workflow under act
         env:
           MOCK_HOST: host.docker.internal
+          # Real token so act can clone referenced actions (including the
+          # internal composite-actions repo). Runtime GitHub API calls
+          # from inside the workflow are routed to WireMock via
+          # GITHUB_API_URL and GH_HOST. The fake event payload points at
+          # a nonexistent repo, so even a leak would fail closed.
+          ACT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
         run: |
           act pull_request \
@@ -68,7 +74,7 @@ jobs:
             --env "AWS_ACCESS_KEY_ID=testing" \
             --env "AWS_SECRET_ACCESS_KEY=testing" \
             --env "AWS_DEFAULT_REGION=us-east-1" \
-            --secret "GITHUB_TOKEN=fake-token-for-tests" \
+            --secret "GITHUB_TOKEN=${ACT_GITHUB_TOKEN}" \
             2>&1 | tee /tmp/act.log
 
       - name: Print WireMock request log
