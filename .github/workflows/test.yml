@@ -36,9 +36,9 @@ jobs:
 
       - name: Seed WireMock with GitHub API stubs
         run: |
-          curl -sf -X POST -H "Content-Type: application/json" \
+          curl --fail-with-body -sS -X POST -H "Content-Type: application/json" \
             --data @testdata/fixtures/comments-empty.json \
-            http://localhost:8080/__admin/mappings
+            http://localhost:8080/__admin/mappings/import
 
       - name: Install act
         env:
