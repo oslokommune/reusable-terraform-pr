@@ -184,7 +184,7 @@ jobs:
         continue-on-error: false
         run: |
           # Finds all comments on current PR
-          comments="$(gh api "/repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST_NUMBER/comments")"
+          comments="$(gh api --paginate "/repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST_NUMBER/comments")"
           # Loop over and delete bot comments that mention stacks that are no longer a part of the PR
           echo "$comments" | jq -r --argjson stacks "$STACKS" \
             '.[]
