@@ -19,8 +19,11 @@ jobs:
           - 5000:5000
       wiremock:
         image: wiremock/wiremock:3.13.2@sha256:fd27e46090916e85326229e5102ee169ae729059f3374549615bd20a35fee1f2
+        # Bind to port 80 so `gh api` (which hardcodes http://api.<host>/
+        # for the special `github.localhost` hostname) can reach it
+        # without explicit port handling.
         ports:
-          - 8080:8080
+          - 80:8080
     env:
       ACT_VERSION: v0.2.89
       ACT_SHA256: 0191d6f1f3b716b5c55820032605d05fc3c1cdbf581ebeff655019e5dd1524c0
@@ -36,7 +39,7 @@ jobs:
       - name: Wait for mock services
         run: |
           timeout 60 bash -c 'until curl -sf http://localhost:5000/moto-api/; do sleep 1; done'
-          timeout 60 bash -c 'until curl -sf http://localhost:8080/__admin/health; do sleep 1; done'
+          timeout 60 bash -c 'until curl -sf http://localhost:80/__admin/health; do sleep 1; done'
 
       - name: Pre-create Terraform state bucket in moto
         env:
@@ -50,7 +53,7 @@ jobs:
         run: |
           curl --fail-with-body -sS -X POST -H "Content-Type: application/json" \
             --data @testdata/fixtures/comments-empty.json \
-            http://localhost:8080/__admin/mappings/import
+            http://localhost:80/__admin/mappings/import
 
       - name: Install act
         env:
@@ -64,7 +67,6 @@ jobs:
 
       - name: Run reusable workflow under act
         env:
-          MOCK_HOST: host.docker.internal
           # Real token so act can clone referenced actions (including the
           # internal composite-actions repo). Runtime GitHub API calls
           # from inside the workflow are routed to WireMock via
@@ -78,13 +80,13 @@ jobs:
             -e testdata/events/pull_request.json \
             --platform ubuntu-latest="${ACT_PLATFORM_IMAGE}" \
             --platform ubuntu-24.04="${ACT_PLATFORM_IMAGE}" \
-            --container-options "--add-host=host.docker.internal:host-gateway" \
+            --container-options "--add-host=api.github.localhost:host-gateway --add-host=host.docker.internal:host-gateway" \
             --artifact-server-path /tmp/act-artifacts \
-            --env "GITHUB_API_URL=http://${MOCK_HOST}:8080" \
-            --env "GH_HOST=${MOCK_HOST}:8080" \
+            --env "GITHUB_API_URL=http://api.github.localhost" \
+            --env "GH_HOST=github.localhost" \
             --env "GITHUB_REPOSITORY=act-test/act-test-fixture" \
             --env "GITHUB_REPOSITORY_OWNER=act-test" \
-            --env "AWS_ENDPOINT_URL=http://${MOCK_HOST}:5000" \
+            --env "AWS_ENDPOINT_URL=http://host.docker.internal:5000" \
             --env "AWS_ACCESS_KEY_ID=testing" \
             --env "AWS_SECRET_ACCESS_KEY=testing" \
             --env "AWS_DEFAULT_REGION=us-east-1" \
@@ -95,9 +97,9 @@ jobs:
         if: always()
         run: |
           echo "=== WireMock request log ==="
-          curl -sf http://localhost:8080/__admin/requests | jq '.requests[] | {method: .request.method, url: .request.url}'
+          curl -sf http://localhost:80/__admin/requests | jq '.requests[] | {method: .request.method, url: .request.url}'
           echo "=== /__admin/requests/count ==="
-          curl -sf http://localhost:8080/__admin/requests/count | jq
+          curl -sf http://localhost:80/__admin/requests/count | jq
 
       - name: Print moto state
         if: always()
