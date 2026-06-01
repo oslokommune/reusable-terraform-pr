@@ -34,6 +34,14 @@ jobs:
           timeout 60 bash -c 'until curl -sf http://localhost:5000/moto-api/; do sleep 1; done'
           timeout 60 bash -c 'until curl -sf http://localhost:8080/__admin/health; do sleep 1; done'
 
+      - name: Pre-create Terraform state bucket in moto
+        env:
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ENDPOINT_URL: http://localhost:5000
+        run: aws s3 mb s3://test-tfstate
+
       - name: Seed WireMock with GitHub API stubs
         run: |
           curl --fail-with-body -sS -X POST -H "Content-Type: application/json" \

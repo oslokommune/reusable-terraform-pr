@@ -7,7 +7,7 @@ jobs:
   call:
     uses: ./.github/workflows/reusable-terraform-pr.yml
     with:
-      selected-stacks: testdata/stacks/null-stack
+      selected-stacks: testdata/stacks/dev/null-stack
       config-file: testdata/.gp.cicd.json
     secrets:
       ssh-private-key: dummy
