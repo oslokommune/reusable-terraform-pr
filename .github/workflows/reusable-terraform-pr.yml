@@ -64,10 +64,17 @@ env:
 jobs:
   recreate-existing-terraform-plan:
     name: Recreate plans
+    # The scoped marker (`<!--terraform-pr-recreate:<workflow>-->`) ensures
+    # that only the matching workflow instance reruns when a checkbox is
+    # clicked. The legacy unscoped marker is kept for backwards compatibility
+    # with summary comments created before this workflow was upgraded.
     if: >-
       ${{
         github.event_name == 'issue_comment'
-        && contains(github.event.comment.body, '[x] Check this box to recreate plans <!--terraform-pr-recreate-->')
+        && (
+          contains(github.event.comment.body, format('[x] Check this box to recreate plans <!--terraform-pr-recreate:{0}-->', github.workflow))
+          || contains(github.event.comment.body, '[x] Check this box to recreate plans <!--terraform-pr-recreate-->')
+        )
       }}
     runs-on: ubuntu-24.04
     permissions:
@@ -144,6 +151,18 @@ jobs:
         with:
           issue-number: ${{ github.event.pull_request.number }}
           comment-author: "github-actions[bot]"
+          body-includes: "<!--terraform-pr-summary:${{ github.workflow }}-->"
+
+      # Backwards compatibility: adopt the legacy unscoped summary comment
+      # on the first run after upgrading. The next write rewrites it with
+      # the workflow-scoped marker, so subsequent runs find it via `fc`.
+      - name: Find legacy Terraform summary comment
+        if: steps.fc.outputs.comment-id == ''
+        uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4.0.0
+        id: fc-legacy
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: "github-actions[bot]"
           body-includes: "<!--terraform-pr-summary-->"
 
       - name: Prepare body
@@ -157,12 +176,12 @@ jobs:
           cat <<EOF > /tmp/body.md
           ## Summary
           🔄 Currently planning ...
-          <!--terraform-pr-summary-->
+          <!--terraform-pr-summary:${GITHUB_WORKFLOW}-->
           <!--terraform-pr-github-run-id:$GITHUB_RUN_ID-->
 
           ---
 
-          - [ ] Check this box to recreate plans <!--terraform-pr-recreate-->
+          - [ ] Check this box to recreate plans <!--terraform-pr-recreate:${GITHUB_WORKFLOW}-->
 
           _Time: ${timestamp}, commit: ${short_sha}_
           EOF
@@ -172,7 +191,7 @@ jobs:
         uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          comment-id: ${{ steps.fc.outputs.comment-id }}
+          comment-id: ${{ steps.fc.outputs.comment-id || steps.fc-legacy.outputs.comment-id }}
           body-file: ${{ steps.body.outputs.file }}
           edit-mode: replace
 
@@ -180,17 +199,24 @@ jobs:
         env:
           PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
           STACKS: ${{ needs.determine-changed-stacks.outputs.all-stacks }}
+          MARKER_PREFIX: "<!--terraform-pr-stack-plan:${{ github.workflow }}:"
           GH_TOKEN: ${{ github.token }}
         continue-on-error: false
         run: |
           # Finds all comments on current PR
           comments="$(gh api --paginate "/repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST_NUMBER/comments")"
-          # Loop over and delete bot comments that mention stacks that are no longer a part of the PR
-          echo "$comments" | jq -r --argjson stacks "$STACKS" \
+          # Loop over and delete bot comments for stacks that are no
+          # longer part of the PR. Only consider stack plan comments
+          # belonging to THIS workflow instance; legacy unscoped
+          # comments are left alone since they cannot be safely
+          # attributed to a specific instance.
+          echo "$comments" | jq -r \
+            --arg prefix "$MARKER_PREFIX" \
+            --argjson stacks "$STACKS" \
             '.[]
-              | select(.user.login == "github-actions[bot]" and (.body | contains("<!--terraform-pr-stack-plan:")))
+              | select(.user.login == "github-actions[bot]" and (.body | contains($prefix)))
               | . as $comment
-              | ($comment.body | match("<!--terraform-pr-stack-plan:([^>]+)-->").captures[0].string) as $stack
+              | (($comment.body | split($prefix))[1] | split("-->")[0]) as $stack
               | select($stacks | index($stack) == null)
               | .id' \
           | while read -r comment_id; do
@@ -375,7 +401,7 @@ jobs:
 
           cat << EOF > details.md
           $heading
-          <!--terraform-pr-stack-plan:$STACK-->
+          <!--terraform-pr-stack-plan:${GITHUB_WORKFLOW}:$STACK-->
           <!--terraform-pr-github-run-id:$GITHUB_RUN_ID-->
 
           Running Terraform in \`$STACK\`.
@@ -400,6 +426,18 @@ jobs:
         with:
           issue-number: ${{ github.event.pull_request.number }}
           comment-author: "github-actions[bot]"
+          body-includes: "<!--terraform-pr-stack-plan:${{ github.workflow }}:${{ matrix.stack }}-->"
+
+      # Backwards compatibility: adopt the legacy unscoped stack plan
+      # comment on the first run after upgrading. The next write rewrites
+      # it with the workflow-scoped marker.
+      - name: Find legacy Terraform plan comment
+        if: ${{ github.event_name == 'pull_request' && steps.fc.outputs.comment-id == '' }}
+        uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4.0.0
+        id: fc-legacy
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: "github-actions[bot]"
           body-includes: "<!--terraform-pr-stack-plan:${{ matrix.stack }}-->"
 
       - name: Create or update Terraform plan comment
@@ -408,7 +446,7 @@ jobs:
         id: c
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          comment-id: ${{ steps.fc.outputs.comment-id }}
+          comment-id: ${{ steps.fc.outputs.comment-id || steps.fc-legacy.outputs.comment-id }}
           body-path: ${{ matrix.stack }}/details.md
           edit-mode: replace
 
@@ -547,11 +585,11 @@ jobs:
             cat <<EOF > /tmp/summary.md
           $summary
           <!--terraform-pr-github-run-id:$GITHUB_RUN_ID-->
-          <!--terraform-pr-summary-->
+          <!--terraform-pr-summary:${GITHUB_WORKFLOW}-->
 
           ---
 
-          - [ ] Check this box to recreate plans <!--terraform-pr-recreate-->
+          - [ ] Check this box to recreate plans <!--terraform-pr-recreate:${GITHUB_WORKFLOW}-->
 
           _Time: ${timestamp}, commit: ${short_sha}_
           EOF
@@ -581,6 +619,18 @@ jobs:
         with:
           issue-number: ${{ github.event.pull_request.number }}
           comment-author: "github-actions[bot]"
+          body-includes: "<!--terraform-pr-summary:${{ github.workflow }}-->"
+
+      # Backwards compatibility: adopt the legacy unscoped summary comment
+      # on the first run after upgrading. The write below rewrites it with
+      # the workflow-scoped marker, so subsequent runs find it via `fc`.
+      - name: Find legacy Terraform summary comment
+        if: ${{ github.event_name == 'pull_request' && steps.fc.outputs.comment-id == '' }}
+        uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4.0.0
+        id: fc-legacy
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: "github-actions[bot]"
           body-includes: "<!--terraform-pr-summary-->"
 
       - name: Create or update Terraform plan comment
@@ -588,7 +638,7 @@ jobs:
         uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
         with:
           issue-number: ${{ github.event.pull_request.number }}
-          comment-id: ${{ steps.fc.outputs.comment-id }}
+          comment-id: ${{ steps.fc.outputs.comment-id || steps.fc-legacy.outputs.comment-id }}
           body-file: ${{ steps.summary.outputs.file }}
           edit-mode: replace
 
