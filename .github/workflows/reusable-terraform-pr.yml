@@ -81,7 +81,11 @@ jobs:
           PR_COMMENT_BODY: ${{ github.event.comment.body }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          run_id="$(echo "$PR_COMMENT_BODY" | sed -n 's/<!--terraform-pr-github-run-id:\(.*\)-->/\1/p' | tr -d '\n\r' | xargs)"
+          # Comment format is <!--terraform-pr-github-run-id:WORKFLOW:RUNID-->.
+          # Workflow names can contain colons, so capture everything after the
+          # last colon (the greedy .\+: consumes up to the final colon).
+          # Both workflow (.\+) and run id ([0-9]\+) must be non-empty.
+          run_id="$(echo "$PR_COMMENT_BODY" | sed -n 's/<!--terraform-pr-github-run-id:.\+:\([0-9]\+\)-->/\1/p' | tr -d '\n\r' | xargs)"
           if [ "$run_id" == "" ]; then
             echo "Failed to find GitHub Actions workflow run id associated with comment" >&2
             exit 1
@@ -158,7 +162,8 @@ jobs:
           ## Summary
           🔄 Currently planning ...
           <!--terraform-pr-summary:$GITHUB_WORKFLOW-->
-          <!--terraform-pr-github-run-id:$GITHUB_RUN_ID-->
+          <!--TODO check naming-->
+          <!--terraform-pr-github-run-id:$GITHUB_WORKFLOW:$GITHUB_RUN_ID-->
 
           ---
 
@@ -376,7 +381,7 @@ jobs:
           cat << EOF > details.md
           $heading
           <!--terraform-pr-stack-plan:$STACK-->
-          <!--terraform-pr-github-run-id:$GITHUB_RUN_ID-->
+          <!--terraform-pr-github-run-id:$GITHUB_WORKFLOW:$GITHUB_RUN_ID-->
 
           Running Terraform in \`$STACK\`.
 
@@ -546,7 +551,7 @@ jobs:
           if [ "$IS_PULL_REQUEST" = "true" ]; then
             cat <<EOF > /tmp/summary.md
           $summary
-          <!--terraform-pr-github-run-id:$GITHUB_RUN_ID-->
+          <!--terraform-pr-github-run-id:$GITHUB_WORKFLOW:$GITHUB_RUN_ID-->
           <!--terraform-pr-summary:$GITHUB_WORKFLOW-->
 
           ---
