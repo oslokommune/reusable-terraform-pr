@@ -67,7 +67,7 @@ jobs:
     if: >-
       ${{
         github.event_name == 'issue_comment'
-        && contains(github.event.comment.body, '[x] Check this box to recreate plans <!--terraform-pr-recreate:${{ github.workflow }}-->')
+        && contains(github.event.comment.body, format('[x] Check this box to recreate plans <!--terraform-pr-recreate:{0}-->', github.workflow))
       }}
     runs-on: ubuntu-24.04
     permissions:
