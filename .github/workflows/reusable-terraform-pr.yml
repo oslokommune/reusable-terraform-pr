@@ -144,6 +144,24 @@ jobs:
     steps:
       - name: Remove comments containing old markers
         run: |
+          # Finn gamle kommentarer
+          # <!--terraform-pr-summary-->
+          # Slett de
+          
+          # Finds all comments on current PR
+          comments="$(gh api --paginate --slurp "/repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST_NUMBER/comments")"
+          # Marker format is <!--terraform-pr-stack-plan:WORKFLOW:STACK-->. We scope to
+          # this workflow's comments, then capture the stack after the last colon
+          # (workflow names can contain colons, stack paths cannot).
+          # Loop over and delete bot comments that mention stacks that are no longer a part of the PR
+          echo "$comments" | jq -r --arg marker "<!--terraform-pr-summary-->" \
+            '.[]
+              | select(.user.login == "github-actions[bot]" and (.body | contains($marker)))
+              | .id' \
+          | while read -r comment_id; do
+            echo "Deleting stale stack plan comment: $comment_id"
+            gh api -X DELETE "/repos/$GITHUB_REPOSITORY/issues/comments/$comment_id"
+          done
 
       - name: Find Terraform summary comment
         uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4.0.0
@@ -192,6 +210,7 @@ jobs:
         continue-on-error: false
         run: |
           # Finds all comments on current PR
+          # TODO Add pagination
           comments="$(gh api "/repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST_NUMBER/comments")"
           # Marker format is <!--terraform-pr-stack-plan:WORKFLOW:STACK-->. We scope to
           # this workflow's comments, then capture the stack after the last colon
