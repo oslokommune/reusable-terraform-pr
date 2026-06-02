@@ -144,7 +144,7 @@ jobs:
         with:
           issue-number: ${{ github.event.pull_request.number }}
           comment-author: "github-actions[bot]"
-          body-includes: "<!--terraform-pr-summary-->"
+          body-includes: "<!--terraform-pr-summary:${{ github.workflow }}-->"
 
       - name: Prepare body
         id: body
@@ -157,7 +157,7 @@ jobs:
           cat <<EOF > /tmp/body.md
           ## Summary
           🔄 Currently planning ...
-          <!--terraform-pr-summary-->
+          <!--terraform-pr-summary:$GITHUB_WORKFLOW-->
           <!--terraform-pr-github-run-id:$GITHUB_RUN_ID-->
 
           ---
@@ -547,7 +547,7 @@ jobs:
             cat <<EOF > /tmp/summary.md
           $summary
           <!--terraform-pr-github-run-id:$GITHUB_RUN_ID-->
-          <!--terraform-pr-summary-->
+          <!--terraform-pr-summary:$GITHUB_WORKFLOW-->
 
           ---
 
@@ -581,7 +581,7 @@ jobs:
         with:
           issue-number: ${{ github.event.pull_request.number }}
           comment-author: "github-actions[bot]"
-          body-includes: "<!--terraform-pr-summary-->"
+          body-includes: "<!--terraform-pr-summary:${{ github.workflow }}-->"
 
       - name: Create or update Terraform plan comment
         if: ${{ github.event_name == 'pull_request' }}
