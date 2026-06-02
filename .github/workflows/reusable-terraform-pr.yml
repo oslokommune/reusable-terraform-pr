@@ -142,24 +142,27 @@ jobs:
     needs:
       - determine-changed-stacks
     steps:
-      - name: Remove comments containing old markers
+      # NOTE: We clean up comments using old marker format before continuing
+      - name: Remove comments with old markers
+        env:
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # Finn gamle kommentarer
-          # <!--terraform-pr-summary-->
-          # Slett de
-          
           # Finds all comments on current PR
-          comments="$(gh api --paginate --slurp "/repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST_NUMBER/comments")"
-          # Marker format is <!--terraform-pr-stack-plan:WORKFLOW:STACK-->. We scope to
-          # this workflow's comments, then capture the stack after the last colon
-          # (workflow names can contain colons, stack paths cannot).
-          # Loop over and delete bot comments that mention stacks that are no longer a part of the PR
-          echo "$comments" | jq -r --arg marker "<!--terraform-pr-summary-->" \
+          comments="$(gh api --paginate "/repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST_NUMBER/comments")"
+
+          echo "$comments" | jq -r \
             '.[]
-              | select(.user.login == "github-actions[bot]" and (.body | contains($marker)))
+              | select(.user.login == "github-actions[bot]")
+              | select(
+                  (.body | test("<!--terraform-pr-summary-->"))
+                  or (.body | test("<!--terraform-pr-recreate-->"))
+                  or (.body | test("<!--terraform-pr-github-run-id:[0-9]+-->"))
+                  or (.body | test("<!--terraform-pr-stack-plan:[^:>]+-->"))
+                )
               | .id' \
           | while read -r comment_id; do
-            echo "Deleting stale stack plan comment: $comment_id"
+            echo "Deleting comment with old marker: $comment_id"
             gh api -X DELETE "/repos/$GITHUB_REPOSITORY/issues/comments/$comment_id"
           done
 
