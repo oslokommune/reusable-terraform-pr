@@ -143,6 +143,7 @@ jobs:
       - determine-changed-stacks
     steps:
       # NOTE: We clean up comments using old marker format before continuing
+      # To be removed when all comments have been deleted
       - name: Remove comments with old markers
         env:
           PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
@@ -186,7 +187,6 @@ jobs:
           ## Summary
           🔄 Currently planning ...
           <!--terraform-pr-summary:$GITHUB_WORKFLOW-->
-          <!--TODO check naming-->
           <!--terraform-pr-github-run-id:$GITHUB_WORKFLOW:$GITHUB_RUN_ID-->
 
           ---
@@ -213,8 +213,7 @@ jobs:
         continue-on-error: false
         run: |
           # Finds all comments on current PR
-          # TODO Add pagination
-          comments="$(gh api "/repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST_NUMBER/comments")"
+          comments="$(gh api --paginate "/repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST_NUMBER/comments")"
           # Marker format is <!--terraform-pr-stack-plan:WORKFLOW:STACK-->. We scope to
           # this workflow's comments, then capture the stack after the last colon
           # (workflow names can contain colons, stack paths cannot).
