@@ -142,8 +142,8 @@ jobs:
     needs:
       - determine-changed-stacks
     steps:
-      # NOTE: We clean up comments using old marker format before continuing
-      # To be removed when all comments have been deleted
+      # NOTE: Clean up comments using old marker format.
+      # To be removed when all comments with old markers have been deleted.
       - name: Remove comments with old markers
         env:
           PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
