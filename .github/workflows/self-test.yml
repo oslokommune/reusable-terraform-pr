@@ -23,9 +23,15 @@ concurrency:
   group: self-test-caller-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: false
 
+# The called reusable workflow's jobs explicitly request these permissions, so
+# the caller must grant at least as much or the run fails validation at startup
+# (even though, in this repo, the AWS/id-token path is skipped).
 permissions:
+  actions: write
   contents: read
+  id-token: write
   pull-requests: write
+  statuses: write
 
 jobs:
   # Belt-and-suspenders: clear any leftover self-test comments before we post
