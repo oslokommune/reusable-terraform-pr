@@ -1,0 +1,192 @@
+name: Self-test
+
+# Exercises the reusable workflow against the cloud-free fixture stacks in
+# tests/fixtures and asserts both its outputs and the PR comments it produces.
+#
+# The reusable workflow's jobs only activate on `pull_request` and
+# `workflow_dispatch` (see the `determine-changed-stacks` job's `if:`):
+#   - pull_request   -> full run incl. comments; we assert outputs AND comments,
+#                       then delete the comments again.
+#   - workflow_dispatch -> comment steps are skipped; we assert outputs only
+#                          (no comments are created, nothing to clean up).
+on:
+  pull_request:
+  workflow_dispatch:
+
+# Serialize per PR (do NOT cancel in-progress). Serializing means two runs never
+# touch the shared `:Self-test` comments at the same time, so the comment
+# assertions are deterministic. GitHub keeps only the latest *pending* run, so
+# this doesn't build a backlog. The group is deliberately different from the
+# reusable workflow's own group (`<workflow>-<pr>`) to avoid a caller/callee
+# concurrency deadlock.
+concurrency:
+  group: self-test-caller-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+# The called reusable workflow's jobs explicitly request these permissions, so
+# the caller must grant at least as much or the run fails validation at startup
+# (even though, in this repo, the AWS/id-token path is skipped).
+permissions:
+  actions: write
+  contents: read
+  id-token: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  # Belt-and-suspenders: clear any leftover self-test comments before we post
+  # fresh ones, so the run starts from a known-clean state even if a previous
+  # run's cleanup didn't complete. No-op outside of pull requests.
+  pre-clean:
+    name: Pre-clean comments
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Delete leftover self-test comments
+        env:
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "${PULL_REQUEST_NUMBER:-}" ]; then
+            echo "Not a pull request - nothing to clean"
+            exit 0
+          fi
+          comments="$(gh api --paginate "/repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST_NUMBER/comments")"
+          echo "$comments" | jq -r --arg wf "$GITHUB_WORKFLOW" \
+            '.[]
+              | select(.user.login == "github-actions[bot]")
+              | select(
+                  (.body | contains("<!--terraform-pr-summary:" + $wf + "-->"))
+                  or (.body | contains("<!--terraform-pr-stack-plan:" + $wf + ":"))
+                )
+              | .id' \
+          | while read -r comment_id; do
+            echo "Deleting leftover self-test comment: $comment_id"
+            gh api -X DELETE "/repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" || true
+          done
+
+  call:
+    name: Plan fixtures
+    needs: pre-clean
+    uses: ./.github/workflows/reusable-terraform-pr.yml
+    with:
+      config-file: tests/fixtures/.gp.cicd.json
+      # Force the matrix to our fixtures regardless of which files changed.
+      selected-stacks: |
+        tests/fixtures/stacks/dev/no-change
+        tests/fixtures/stacks/dev/has-change
+
+  assert-outputs:
+    name: Assert outputs
+    needs: call
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check reusable workflow outputs
+        env:
+          RESULT: ${{ needs.call.result }}
+          SUCCESS: ${{ needs.call.outputs.success }}
+          HAS_CHANGES: ${{ needs.call.outputs.has-changes }}
+          STACKS: ${{ needs.call.outputs.stacks }}
+        run: |
+          echo "result=$RESULT success=$SUCCESS has-changes=$HAS_CHANGES"
+          echo "stacks=$STACKS"
+
+          fail=0
+          check() { # check <description> <actual> <expected>
+            if [ "$2" != "$3" ]; then
+              echo "::error::$1: expected '$3', got '$2'"
+              fail=1
+            fi
+          }
+
+          check "reusable workflow result" "$RESULT" "success"
+          # Both fixtures plan cleanly, so all plans succeed ...
+          check "success output" "$SUCCESS" "true"
+          # ... and the has-change fixture means there are changes overall.
+          check "has-changes output" "$HAS_CHANGES" "true"
+
+          # determine-stacks returns all-stacks sorted, so the order is stable.
+          expected='["tests/fixtures/stacks/dev/has-change","tests/fixtures/stacks/dev/no-change"]'
+          got="$(printf '%s' "$STACKS" | jq -c '.')"
+          check "stacks output" "$got" "$expected"
+
+          if [ "$fail" -ne 0 ]; then
+            echo "Output assertions failed" >&2
+            exit 1
+          fi
+          echo "Output assertions passed ✅"
+
+  assert-comments:
+    name: Assert comments
+    needs: call
+    # Comments only exist on pull_request runs.
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check the workflow's PR comments
+        env:
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          comments="$(gh api --paginate "/repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST_NUMBER/comments")"
+
+          fail=0
+          # has <marker> [<also-contains>] -> assert a bot comment with the marker
+          # (optionally also containing a second substring) exists.
+          has() {
+            local desc="$1" marker="$2" also="${3:-}"
+            if ! echo "$comments" | jq -e \
+              --arg m "$marker" --arg a "$also" \
+              'any(.[];
+                 .user.login == "github-actions[bot]"
+                 and (.body | contains($m))
+                 and ($a == "" or (.body | contains($a))))' >/dev/null; then
+              echo "::error::missing/incorrect comment: $desc"
+              fail=1
+            fi
+          }
+
+          wf="$GITHUB_WORKFLOW"
+          has "summary comment + recreate checkbox" \
+            "<!--terraform-pr-summary:$wf-->" "Check this box to recreate plans"
+          has "no-change plan comment (🟩)" \
+            "<!--terraform-pr-stack-plan:$wf:tests/fixtures/stacks/dev/no-change-->" "🟩"
+          has "has-change plan comment (🟧)" \
+            "<!--terraform-pr-stack-plan:$wf:tests/fixtures/stacks/dev/has-change-->" "🟧"
+
+          if [ "$fail" -ne 0 ]; then
+            echo "Comment assertions failed" >&2
+            exit 1
+          fi
+          echo "Comment assertions passed ✅"
+
+  cleanup:
+    name: Delete self-test comments
+    needs:
+      - call
+      - assert-outputs
+      - assert-comments
+    # Always run (even on failure) so we don't leave comments on the PR. The
+    # marker match is run-agnostic, so it also sweeps anything an earlier run
+    # orphaned. No-op outside of pull requests.
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Delete this workflow's plan comments
+        env:
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          comments="$(gh api --paginate "/repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST_NUMBER/comments")"
+          echo "$comments" | jq -r --arg wf "$GITHUB_WORKFLOW" \
+            '.[]
+              | select(.user.login == "github-actions[bot]")
+              | select(
+                  (.body | contains("<!--terraform-pr-summary:" + $wf + "-->"))
+                  or (.body | contains("<!--terraform-pr-stack-plan:" + $wf + ":"))
+                )
+              | .id' \
+          | while read -r comment_id; do
+            echo "Deleting self-test comment: $comment_id"
+            gh api -X DELETE "/repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" || true
+          done
