@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.5.2...v1.6.0) (2026-06-03)
+
+
+### Features
+
+* support multiple instances of the workflow in a repository ([#26](https://github.com/oslokommune/reusable-terraform-pr/issues/26)) ([8d145d2](https://github.com/oslokommune/reusable-terraform-pr/commit/8d145d280aaa89c29e4dfe662170a4432d9d48ca))
+
 ## [1.5.2](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.5.1...v1.5.2) (2026-04-20)
 
 
