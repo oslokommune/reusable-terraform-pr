@@ -1,0 +1,121 @@
+name: Self-test failure
+
+# Negative self-test: runs the reusable workflow against a fixture stack whose
+# plan fails, and asserts the workflow reports that failure (result == failure,
+# success output != true).
+#
+# IMPORTANT: a failing plan fails the reusable workflow's `call` job, and
+# `continue-on-error` is not allowed on a `uses:` job — so this workflow's
+# overall run shows as FAILED *by design*. The green "Assert failure" job is the
+# real pass signal. (This awkwardness is why negative coverage ultimately
+# belongs in a unit test of the extracted logic, rather than a full E2E.)
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: self-test-failure-caller-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+  id-token: write
+  pull-requests: write
+  statuses: write
+
+jobs:
+  pre-clean:
+    name: Pre-clean comments
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Delete leftover self-test comments
+        env:
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "${PULL_REQUEST_NUMBER:-}" ]; then
+            echo "Not a pull request - nothing to clean"
+            exit 0
+          fi
+          comments="$(gh api --paginate "/repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST_NUMBER/comments")"
+          echo "$comments" | jq -r --arg wf "$GITHUB_WORKFLOW" \
+            '.[]
+              | select(.user.login == "github-actions[bot]")
+              | select(
+                  (.body | contains("<!--terraform-pr-summary:" + $wf + "-->"))
+                  or (.body | contains("<!--terraform-pr-stack-plan:" + $wf + ":"))
+                )
+              | .id' \
+          | while read -r comment_id; do
+            echo "Deleting leftover self-test comment: $comment_id"
+            gh api -X DELETE "/repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" || true
+          done
+
+  call:
+    name: Plan failing fixture
+    needs: pre-clean
+    uses: ./.github/workflows/reusable-terraform-pr.yml
+    with:
+      config-file: tests/fixtures/.gp.cicd.json
+      selected-stacks: tests/fixtures/stacks/dev/fails
+
+  assert-failure:
+    name: Assert failure
+    needs: call
+    # Runs even though `call` fails - that failure is exactly what we assert.
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Assert the workflow reported failure
+        env:
+          RESULT: ${{ needs.call.result }}
+          SUCCESS: ${{ needs.call.outputs.success }}
+          HAS_CHANGES: ${{ needs.call.outputs.has-changes }}
+        run: |
+          echo "result=$RESULT success=$SUCCESS has-changes=$HAS_CHANGES"
+
+          fail=0
+          if [ "$RESULT" != "failure" ]; then
+            echo "::error::expected the reusable workflow to fail, got '$RESULT'"
+            fail=1
+          fi
+          # On a failed plan the success output must not be 'true' (it is 'false',
+          # or empty if the failed job didn't propagate the output).
+          if [ "$SUCCESS" = "true" ]; then
+            echo "::error::expected success output != 'true', got '$SUCCESS'"
+            fail=1
+          fi
+
+          if [ "$fail" -ne 0 ]; then
+            echo "Expected-failure assertions failed" >&2
+            exit 1
+          fi
+          echo "Expected-failure assertions passed ✅ (workflow correctly reported failure)"
+
+  cleanup:
+    name: Delete self-test comments
+    needs:
+      - call
+      - assert-failure
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Delete this workflow's plan comments
+        env:
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          comments="$(gh api --paginate "/repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST_NUMBER/comments")"
+          echo "$comments" | jq -r --arg wf "$GITHUB_WORKFLOW" \
+            '.[]
+              | select(.user.login == "github-actions[bot]")
+              | select(
+                  (.body | contains("<!--terraform-pr-summary:" + $wf + "-->"))
+                  or (.body | contains("<!--terraform-pr-stack-plan:" + $wf + ":"))
+                )
+              | .id' \
+          | while read -r comment_id; do
+            echo "Deleting self-test comment: $comment_id"
+            gh api -X DELETE "/repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" || true
+          done
