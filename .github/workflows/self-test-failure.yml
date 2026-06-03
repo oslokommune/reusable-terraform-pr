@@ -1,4 +1,4 @@
-name: Self-test failure
+name: Self-test (expected failure)
 
 # Negative self-test: runs the reusable workflow against a fixture stack whose
 # plan fails, and asserts the workflow reports that failure (result == failure,
@@ -53,7 +53,11 @@ jobs:
           done
 
   call:
-    name: Plan failing fixture
+    # This job is EXPECTED to fail - it runs the reusable workflow against a
+    # fixture whose plan errors on purpose. Its red status is the point of the
+    # test; the green "Assert failure" job is the real pass signal. Keep this
+    # out of required status checks so it never blocks a merge.
+    name: Expected failure (plan must error)
     needs: pre-clean
     uses: ./.github/workflows/reusable-terraform-pr.yml
     with:
