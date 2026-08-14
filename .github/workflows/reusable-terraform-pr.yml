@@ -141,6 +141,8 @@ jobs:
       pull-requests: write
     needs:
       - determine-changed-stacks
+    outputs:
+      summary-comment-id: ${{ steps.create-comment.outputs.comment-id }}
     steps:
       # NOTE: Clean up comments using old marker format.
       # To be removed when all comments with old markers have been deleted.
@@ -198,6 +200,7 @@ jobs:
           echo "file=/tmp/body.md" >> "$GITHUB_OUTPUT"
 
       - name: Create or update Terraform plan comment
+        id: create-comment
         uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
         with:
           issue-number: ${{ github.event.pull_request.number }}
@@ -337,6 +340,12 @@ jobs:
             }}
           SUCCESS: ${{ steps.plan.outcome == 'success' }}
           PLAN_OUTCOME: ${{ steps.plan.outcome }}
+          SUMMARY_COMMENT_URL: >-
+            ${{
+              github.event_name == 'pull_request'
+              && format('{0}/{1}/pull/{2}#issuecomment-{3}', github.server_url, github.repository, github.event.pull_request.number, needs.create-summary-comment.outputs.summary-comment-id)
+              || ''
+            }}
           STACK: ${{ matrix.stack }}
           STACK_POSITION: ${{ steps.stack-meta.outputs.position }}
           GITHUB_RUN_ID: ${{ github.run_id }}
@@ -345,6 +354,7 @@ jobs:
           timestamp="$(date +"%a %d. %b %T")"
           short_sha="$(echo "$COMMIT_SHA" | cut -c-8)"
           plan_summary=""
+          merge_warning=""
           # Extract plan summary if successful
           if [ "$SUCCESS" = "true" ]; then
             code_block_syntax="terraform"
@@ -368,6 +378,13 @@ jobs:
             code_block_syntax=""
             toggle_text="Show error"
             status="❌ Terraform plan failed"
+            summary_comment_ref="the summary comment"
+            if [ "$SUMMARY_COMMENT_URL" != "" ]; then
+              summary_comment_ref="the [summary comment]($SUMMARY_COMMENT_URL)"
+            fi
+            merge_warning="> [!CAUTION]
+          > **A failed plan can lead to unexpected changes after merge.**
+          > If you merge this PR, a fresh plan will be created and applied for this stack. See $summary_comment_ref on why this can be dangerous."
           fi
 
           # Check if truncation needed
@@ -413,6 +430,8 @@ jobs:
           Running Terraform in \`$STACK\`.
 
           **$status**
+
+          $merge_warning
 
           $details
 
@@ -576,7 +595,18 @@ jobs:
 
           # Build PR-specific content
           if [ "$IS_PULL_REQUEST" = "true" ]; then
+            if [ "$success" = "true" ]; then
+              merge_admonition="> [!NOTE]
+          > **PR plans are not reused on apply.**
+          > When you merge this PR, a fresh plan will be generated and applied for each stack listed below. Keeping the PR up to date with the default branch ensures that plans are not stale and match what the applies will do."
+            else
+              merge_admonition="> [!CAUTION]
+          > **Do not merge this PR unless you know what you are doing.**
+          > Plan failed for one or more stacks. Apply will still be attempted after merging, and since a fresh plan is created and the apply role has broader permissions than the plan role, it can make changes that no plan has shown. Merge only after all plans are successful."
+            fi
             cat <<EOF > /tmp/summary.md
+          $merge_admonition
+
           $summary
           <!--terraform-pr-github-run-id:$GITHUB_WORKFLOW:$GITHUB_RUN_ID-->
           <!--terraform-pr-summary:$GITHUB_WORKFLOW-->
