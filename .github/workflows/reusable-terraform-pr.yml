@@ -345,6 +345,7 @@ jobs:
           timestamp="$(date +"%a %d. %b %T")"
           short_sha="$(echo "$COMMIT_SHA" | cut -c-8)"
           plan_summary=""
+          merge_warning=""
           # Extract plan summary if successful
           if [ "$SUCCESS" = "true" ]; then
             code_block_syntax="terraform"
@@ -368,6 +369,8 @@ jobs:
             code_block_syntax=""
             toggle_text="Show error"
             status="❌ Terraform plan failed"
+            merge_warning="> [!WARNING]
+          > Apply will still be attempted for this stack after merging, even though the plan failed. See the summary comment before merging."
           fi
 
           # Check if truncation needed
@@ -413,6 +416,8 @@ jobs:
           Running Terraform in \`$STACK\`.
 
           **$status**
+
+          $merge_warning
 
           $details
 
@@ -576,7 +581,18 @@ jobs:
 
           # Build PR-specific content
           if [ "$IS_PULL_REQUEST" = "true" ]; then
+            if [ "$success" = "true" ]; then
+              merge_admonition="> [!NOTE]
+          > **PR plans are not reused on apply.**
+          > When you merge this PR, a fresh plan will be generated and applied for each stack listed below. Keeping the PR up to date with the default branch ensures that plans are not stale and match what the applies will do."
+            else
+              merge_admonition="> [!CAUTION]
+          > **Do not merge this PR unless you know what you are doing.**
+          > Plan failed for one or more stacks. Apply will still be attempted after merging, and since a fresh plan is created and the apply role has broader permissions than the plan role, it can make changes that no plan has shown. Merge only after all plans are successful."
+            fi
             cat <<EOF > /tmp/summary.md
+          $merge_admonition
+
           $summary
           <!--terraform-pr-github-run-id:$GITHUB_WORKFLOW:$GITHUB_RUN_ID-->
           <!--terraform-pr-summary:$GITHUB_WORKFLOW-->
