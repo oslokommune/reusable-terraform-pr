@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.6.0...v1.6.1) (2026-08-14)
+
+
+### Bug Fixes
+
+* explain apply behavior in PR comments ([#30](https://github.com/oslokommune/reusable-terraform-pr/issues/30)) ([59aeeb1](https://github.com/oslokommune/reusable-terraform-pr/commit/59aeeb15c9728718e3d548f885baeb3574691e16))
+
 ## [1.6.0](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.5.2...v1.6.0) (2026-06-03)
 
 
