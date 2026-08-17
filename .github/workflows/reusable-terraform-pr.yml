@@ -326,20 +326,39 @@ jobs:
         working-directory: ${{ matrix.stack }}
         continue-on-error: true
         run: |
-          terraform plan -lock=false -no-color -input=false -no-color -detailed-exitcode
+          terraform plan -lock=false -no-color -input=false -detailed-exitcode -out="$RUNNER_TEMP/tfplan"
+          echo "plan-file=$RUNNER_TEMP/tfplan" >> "$GITHUB_OUTPUT"
+
+      # We render the saved plan with colors and without state-refresh noise.
+      # When a plan is too large for a PR comment, we direct users to the output of this step.
+      - name: Show Terraform plan
+        id: show
+        if: steps.plan.outcome == 'success'
+        # This step only renders the plan for humans reading the log.
+        # A failure here should not stop the plan summary and PR comment.
+        continue-on-error: true
+        working-directory: ${{ matrix.stack }}
+        env:
+          PLAN_FILE: ${{ steps.plan.outputs.plan-file }}
+        run: |
+          terraform show "$PLAN_FILE"
 
       - name: Create Terraform plan summary file
         id: plan-summary
         env:
           WORKFLOW_RUN_URL: ${{ github.server_url}}/${{ github.repository }}/actions/runs/${{ github.run_id }}/job/${{ job.check_run_id }}?pr=${{ github.event.pull_request.number }}
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
-          TF_SUMMARY: >-
+          # We read the plan itself from file to avoid large plans that exceed
+          # the size of environment variables. Errors and output from `terraform init`
+          # should, however, be fine to store in an environment variable.
+          TF_FAILURE_OUTPUT: >-
             ${{
-              format('{0}{1}', steps.plan.outputs.stdout || '', steps.plan.outputs.stderr || '')
+              steps.plan.outputs.stderr
               || format('{0}{1}', steps.init.outputs.stdout || '', steps.init.outputs.stderr || '')
             }}
-          SUCCESS: ${{ steps.plan.outcome == 'success' }}
           PLAN_OUTCOME: ${{ steps.plan.outcome }}
+          SHOW_PLAN_OUTCOME: ${{ steps.show.outcome }}
+          PLAN_FILE: ${{ steps.plan.outputs.plan-file }}
           SUMMARY_COMMENT_URL: >-
             ${{
               github.event_name == 'pull_request'
@@ -355,12 +374,19 @@ jobs:
           short_sha="$(echo "$COMMIT_SHA" | cut -c-8)"
           plan_summary=""
           merge_warning=""
+          if [ "$PLAN_OUTCOME" = "success" ]; then
+            if ! tf_summary="$(terraform show -no-color "$PLAN_FILE")"; then
+              tf_summary="Failed to render the saved plan. See the workflow logs."
+            fi
+          else
+            tf_summary="$TF_FAILURE_OUTPUT"
+          fi
           # Extract plan summary if successful
-          if [ "$SUCCESS" = "true" ]; then
+          if [ "$PLAN_OUTCOME" = "success" ]; then
             code_block_syntax="terraform"
             emoji="🟩"
             toggle_text="Show plan"
-            if ! plan_summary="$(echo "$TF_SUMMARY" | grep -E "(Plan: (.*[0-9]+ to add, [0-9]+ to change, [0-9]+ to destroy)|No changes\. Your infrastructure matches the configuration)" | sed -E 's/Plan: (.*)/\1/; s/(No changes)\..*/\1/')"; then
+            if ! plan_summary="$(echo "$tf_summary" | grep -E "(Plan: (.*[0-9]+ to add, [0-9]+ to change, [0-9]+ to destroy)|No changes\. Your infrastructure matches the configuration)" | sed -E 's/Plan: (.*)/\1/; s/(No changes)\..*/\1/')"; then
               plan_summary=""
             fi
             if [ "$plan_summary" != "" ]; then
@@ -392,11 +418,14 @@ jobs:
           workflow_run_url="$WORKFLOW_RUN_URL"
           # Max comment length is 65536 characters. We truncate if Terraform output
           # is larger than 63536 characters - leaving 2000 characters for other comment content
-          if [ "$( echo "$TF_SUMMARY" | wc -c)" -gt 63536 ]; then
+          if [ "$( echo "$tf_summary" | wc -c)" -gt 63536 ]; then
             needs_truncation="true"
 
-            if [ "$PLAN_OUTCOME" != "skipped" ]; then
-              # We link directly to the plan step if plan was truncated
+            if [ "$PLAN_OUTCOME" = "success" ] && [ "$SHOW_PLAN_OUTCOME" = "success" ]; then
+              # We link directly to the colored "Show Terraform plan" step if the comment was truncated
+              workflow_run_url="$workflow_run_url#step:12:0"
+            elif [ "$PLAN_OUTCOME" != "skipped" ]; then
+              # We link directly to the plan step, which contains the full output
               workflow_run_url="$workflow_run_url#step:11:0"
             else
               # If plan didn't run and truncation is needed, that means
@@ -413,7 +442,7 @@ jobs:
             details="<details><summary>$toggle_text</summary>
 
           \`\`\`$code_block_syntax
-          $TF_SUMMARY
+          $tf_summary
           \`\`\`
           </details>
           "
