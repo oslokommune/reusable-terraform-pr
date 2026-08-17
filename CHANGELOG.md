@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.2](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.6.1...v1.6.2) (2026-08-17)
+
+
+### Bug Fixes
+
+* improve handling of large plans ([#32](https://github.com/oslokommune/reusable-terraform-pr/issues/32)) ([06bdc95](https://github.com/oslokommune/reusable-terraform-pr/commit/06bdc9556f74e5cd3b2e20163ef93883698cf208))
+
 ## [1.6.1](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.6.0...v1.6.1) (2026-08-14)
 
 
