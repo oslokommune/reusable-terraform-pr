@@ -10,7 +10,7 @@ on:
       selected-stacks:
         type: string
         default: ""
-        description: 'Comma/newline-delimited list of stack patterns to plan (e.g., "stacks/dev/{dns,iam}","stacks/dev/app-hello,stacks/prod/app-hello"). By default, only stacks with changed files are planned. Set "selected-stacks" to override this behavior.'
+        description: 'Comma/newline-delimited list of stack patterns to plan (e.g., "stacks/dev/{dns,iam}","stacks/dev/app-hello,stacks/prod/app-hello"). By default, only stacks with changed files are planned. Set "selected-stacks" to override this behavior. Required on "schedule" events, where there are no changed files to discover stacks from.'
         required: false
       ignored-stacks:
         type: string
@@ -48,7 +48,8 @@ on:
 # failure while the individual plan comment shows success, or vice versa.
 concurrency:
   # We only enable concurrency control for pull request events. Runs triggered
-  # through workflow dispatch can run in parallel as they don't affect each other.
+  # through workflow dispatch or a schedule can run in parallel as they don't
+  # affect each other.
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   # We cancel in-progress concurrent runs immediately to get quicker feedback
   # and since the old plans are outdated anyway.
@@ -99,7 +100,9 @@ jobs:
   determine-changed-stacks:
     if: >-
       ${{
-        github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+        github.event_name == 'workflow_dispatch'
+        || github.event_name == 'pull_request'
+        || github.event_name == 'schedule'
       }}
     name: Determine stacks
     runs-on: ubuntu-24.04
@@ -111,6 +114,19 @@ jobs:
       all-dev-stacks: ${{ steps.determine.outputs.all-dev-stacks }}
       all-prod-stacks: ${{ steps.determine.outputs.all-prod-stacks }}
     steps:
+      # Stack discovery is diff based, and a scheduled run has no diff to compare
+      # against. Without "selected-stacks" it would find no stacks, plan nothing
+      # and still report success - which reads as "no drift".
+      - name: Require selected stacks on scheduled runs
+        if: ${{ github.event_name == 'schedule' }}
+        env:
+          SELECTED_STACKS: ${{ inputs.selected-stacks }}
+        run: |
+          if [ "$SELECTED_STACKS" == "" ]; then
+            echo "🚨The 'selected-stacks' input is required on 'schedule' events" >&2
+            exit 1
+          fi
+
       # determine-stacks requires code to be checked out in order to
       # find changed files
       - name: Checkout code
