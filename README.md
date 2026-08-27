@@ -36,7 +36,7 @@ jobs:
 | Name                 | Type    | Default         | Description                                                                                                                                                        |
 |----------------------|---------|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `config-file`        | string  | `.gp.cicd.json` | Path to CI/CD configuration file                                                                                                                                   |
-| `selected-stacks`    | string  | `""`            | Comma/newline-delimited list of stack patterns to plan (e.g., `stacks/dev/{dns,iam}`, `stacks/dev/app-*`). By default, only stacks with changed files are planned. |
+| `selected-stacks`    | string  | `""`            | Comma/newline-delimited list of stack patterns to plan (e.g., `stacks/dev/{dns,iam}`, `stacks/dev/app-*`). By default, only stacks with changed files are planned. Required on `schedule` events. |
 | `ignored-stacks`     | string  | `""`            | Comma/newline-delimited list of stack patterns to always ignore.                                                                                                   |
 | `pr-automerge`       | boolean | `false`         | Whether to evaluate Renovate PRs for automerge eligibility based on upgrade type and Terraform plan results.                                                       |
 | `pr-automerge-rules` | string  | `[]`            | JSON array of rules with pattern matching and per-update-type policies. Only used when `pr-automerge` is enabled. See [automerge](#with-automerge) for details.    |
@@ -75,6 +75,55 @@ jobs:
     secrets:
       ssh-private-key: ${{ secrets.GOLDEN_PATH_IAC_PRIVATE_DEPLOY_KEY }}
 ```
+
+### Scheduled drift detection
+
+Add a `schedule` trigger to detect drift between the Terraform code on the default branch and the infrastructure it describes. Requires `>= v1.7.0`.
+
+Use a separate caller workflow for this. Scheduled runs have different failure semantics than PR runs: on a PR, a plan with changes is the expected outcome, while on a schedule it means the infrastructure no longer matches the code.
+
+`selected-stacks` is required on `schedule` events. Stack discovery is diff-based, and a scheduled run has no diff to compare against, so the workflow fails instead of silently planning nothing. Adapt the glob to the layout of your repository.
+
+`.github/workflows/terraform-drift.yml`:
+
+```yaml
+name: "Terraform drift"
+
+on:
+  schedule:
+    # 03:00 UTC, Monday through Friday. Cron schedules are always UTC.
+    - cron: "0 3 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  plan:
+    uses: oslokommune/reusable-terraform-pr/.github/workflows/reusable-terraform-pr.yml@v1
+    with:
+      selected-stacks: "stacks/**"
+    secrets:
+      ssh-private-key: ${{ secrets.GOLDEN_PATH_IAC_PRIVATE_DEPLOY_KEY }}
+
+  notify:
+    name: Notify on drift
+    needs: plan
+    # The 'success' guard makes sure we only report drift when every plan
+    # completed. A failed plan means "drift unknown", not "drift".
+    if: ${{ needs.plan.result == 'success' && needs.plan.outputs.has-changes == 'true' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Fail the run to report drift
+        run: |
+          echo "::error title=Drift detected::One or more stacks have changes. See the summary of the plan jobs."
+          exit 1
+```
+
+Failing the `notify` job makes the scheduled run show up as red, which GitHub notifies watchers of. No Slack integration and no extra secrets are needed.
+
+Things worth knowing:
+
+- **Requires `>= v1.7.0`.** Earlier versions ignore `schedule` events: every job is skipped, nothing is planned, and the run still reports success. Pin the caller accordingly, so that a green run means "no drift" rather than "never ran".
+- **A failed plan is not drift.** It means drift is unknown for that stack. The `needs.plan.result == 'success'` guard keeps the drift alert quiet in that case, and the `plan` job fails on its own, so the run is still red.
+- **Alerts repeat.** The run fails every night until the drift is either applied or removed from the code.
 
 ### With automerge
 
