@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.3](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.6.2...v1.6.3) (2026-08-28)
+
+
+### Dependency Updates
+
+* update internal github actions ([#36](https://github.com/oslokommune/reusable-terraform-pr/issues/36)) ([5d30cb3](https://github.com/oslokommune/reusable-terraform-pr/commit/5d30cb3096bdef3ca9b2343aaa36ee663c48f9e9))
+
 ## [1.6.2](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.6.1...v1.6.2) (2026-08-17)
 
 
