@@ -118,7 +118,7 @@ jobs:
 
       - name: Determine changed stacks
         id: determine
-        uses: oslokommune/composite-actions/determine-stacks@a050629d84616b1428f802f674a2fd41c3e8b68a # determine-stacks-v1.2.2
+        uses: oslokommune/composite-actions/determine-stacks@55ee2c7bef4b80f4535761f03b8f3d07e064836f # determine-stacks-v1.2.3
         with:
           selected-stacks: ${{ inputs.selected-stacks }}
           ignored-stacks: ${{ inputs.ignored-stacks }}
@@ -717,7 +717,7 @@ jobs:
             && needs.summarize.outputs.success == 'true'
             && github.event.pull_request.commits == 1
           }}
-        uses: oslokommune/composite-actions/evaluate-automerge@a050629d84616b1428f802f674a2fd41c3e8b68a # evaluate-automerge-v1.0.1
+        uses: oslokommune/composite-actions/evaluate-automerge@55ee2c7bef4b80f4535761f03b8f3d07e064836f # evaluate-automerge-v1.0.2
         with:
           rules: ${{ inputs.pr-automerge-rules }}
           stack-changes: ${{ needs.summarize.outputs.stack-changes }}
