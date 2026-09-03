@@ -43,11 +43,12 @@ jobs:
 
 ### Outputs
 
-| Name          | Type                | Description                                |
-|---------------|---------------------|--------------------------------------------|
-| `success`     | boolean             | Whether all Terraform plans succeeded      |
-| `has-changes` | boolean             | Whether any stack had changes              |
-| `stacks`      | string (JSON array) | JSON array of all stacks that were planned |
+| Name            | Type                 | Description                                                                                                          |
+|-----------------|----------------------|----------------------------------------------------------------------------------------------------------------------|
+| `success`       | boolean              | Whether all Terraform plans succeeded                                                                                |
+| `has-changes`   | boolean              | Whether any stack had changes                                                                                        |
+| `stacks`        | string (JSON array)  | JSON array of all stacks that were planned                                                                           |
+| `stack-changes` | string (JSON object) | Maps each stack whose plan succeeded to whether it had changes, e.g. `{"stacks/dev/app": true, "stacks/prod/app": false}` |
 
 ### With manual trigger
 
