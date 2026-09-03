@@ -113,12 +113,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Fail the run to report drift
+        env:
+          STACK_CHANGES: ${{ needs.plan.outputs.stack-changes }}
         run: |
-          echo "::error title=Drift detected::One or more stacks have changes. See the summary of the plan jobs."
+          drifted="$(echo "$STACK_CHANGES" | jq -r 'to_entries[] | select(.value) | .key' | paste -sd ' ' -)"
+          echo "::error title=Drift detected::Stacks with changes: ${drifted}. See the summary of the plan jobs."
           exit 1
 ```
 
-Failing the `notify` job makes the scheduled run show up as red, which GitHub notifies watchers of. No Slack integration and no extra secrets are needed.
+Failing the `notify` job makes the scheduled run show up as red, which GitHub notifies watchers of. The error annotation names the drifted stacks, so the run page says what changed without opening the job summary. No Slack integration and no extra secrets are needed.
 
 Things worth knowing:
 
