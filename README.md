@@ -106,9 +106,9 @@ jobs:
   notify:
     name: Notify on drift
     needs: plan
-    # The 'success' guard makes sure we only report drift when every plan
-    # completed. A failed plan means "drift unknown", not "drift".
-    if: ${{ needs.plan.result == 'success' && needs.plan.outputs.has-changes == 'true' }}
+    # Alert on drift even when some other stack failed to plan. has-changes only
+    # counts stacks whose plan succeeded. A failed plan fails the run on its own.
+    if: ${{ !cancelled() && needs.plan.outputs.has-changes == 'true' }}
     runs-on: ubuntu-24.04
     steps:
       - name: Fail the run to report drift
@@ -122,7 +122,7 @@ Failing the `notify` job makes the scheduled run show up as red, which GitHub no
 Things worth knowing:
 
 - **Requires `>= v1.7.0`.** Earlier versions ignore `schedule` events: every job is skipped, nothing is planned, and the run still reports success. Pin the caller accordingly, so that a green run means "no drift" rather than "never ran".
-- **A failed plan is not drift.** It means drift is unknown for that stack. The `needs.plan.result == 'success'` guard keeps the drift alert quiet in that case, and the `plan` job fails on its own, so the run is still red.
+- **A failed plan is not drift.** It means drift is unknown for that stack. `has-changes` only counts stacks whose plan succeeded, so the `notify` job still alerts on drift in the other stacks. Do not guard it with `needs.plan.result == 'success'`: one permanently broken stack would then suppress every drift alert. The `plan` job fails on its own when a plan fails, so the run is red either way.
 - **Alerts repeat.** The run fails every night until the drift is either applied or removed from the code.
 
 ### With automerge
