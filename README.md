@@ -127,7 +127,17 @@ Things worth knowing:
 
 - **Requires `>= v1.7.0`.** Earlier versions ignore `schedule` events: every job is skipped, nothing is planned, and the run still reports success. Pin the caller accordingly, so that a green run means "no drift" rather than "never ran".
 - **A failed plan is not drift.** It means drift is unknown for that stack. `has-changes` only counts stacks whose plan succeeded, so the `notify` job still alerts on drift in the other stacks. Do not guard it with `needs.plan.result == 'success'`: one permanently broken stack would then suppress every drift alert. The `plan` job fails on its own when a plan fails, so the run is red either way.
-- **Alerts repeat.** The run fails every night until the drift is either applied or removed from the code.
+- **Use `ignored-stacks` for stacks that always fail or always differ.** Some stacks fail to plan for reasons unrelated to drift, such as a provider that no longer runs. Others show a diff on every plan, such as a `null_resource` with a timestamp trigger. Either kind makes the scheduled run red forever. Exclude them until they are fixed:
+
+  ```yaml
+      with:
+        selected-stacks: "stacks/**"
+        ignored-stacks: |
+          stacks/dev/slackbot
+          stacks/*/legacy-*
+  ```
+
+- **Alerts repeat.** The run fails every night until the drift is either applied or removed from the code. A red run that is the normal state stops getting attention, so deal with drift quickly or ignore the stack explicitly.
 
 ### With automerge
 
