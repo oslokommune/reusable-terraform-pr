@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.8.0](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.7.0...v1.8.0) (2026-09-04)
+
+
+### Features
+
+* add Agent Plugins manifest ([014881b](https://github.com/oslokommune/reusable-terraform-pr/commit/014881be54796d03954c95f62f4184158300a440))
+* add Claude Code plugin manifest and marketplace ([2bd4302](https://github.com/oslokommune/reusable-terraform-pr/commit/2bd43020a8cfcc74baa75dce23adfec0ef9a59f3))
+* add terraform-drift-detection skill ([41408ee](https://github.com/oslokommune/reusable-terraform-pr/commit/41408ee8b40d585f9e5ef6e51d0fdb3b364de987))
+
 ## [1.7.0](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.6.3...v1.7.0) (2026-09-04)
 
 
