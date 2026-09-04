@@ -117,7 +117,7 @@ The reusable workflow only plans. A `report` job in the caller, run on `schedule
 The report job does not depend on the plan job succeeding, so one broken stack does not hide drift in the others. Stacks that always have changes, such as a service scaled outside Terraform, are listed in the report job as expected changes and skipped. They are still planned and shown in the summary. Use `ignored-stacks` for stacks that should not be planned at all.
 
 > [!TIP]
-> [pirates-iac](https://github.com/oslokommune/pirates-iac/blob/main/.github/workflows/terraform-pr.yml) has a complete workflow with the `schedule` trigger and the report job. Copy it and adjust the list of expected changes.
+> [pirates-iac](https://github.com/oslokommune/pirates-iac/blob/main/.github/workflows/terraform-pr.yml) has a complete workflow with the `schedule` trigger and the report job. Copy it and adjust the list of expected changes, or let an agent do it with the [`terraform-drift-detection` skill](#agent-plugin).
 
 ### With automerge
 
@@ -151,3 +151,20 @@ jobs:
     secrets:
       ssh-private-key: ${{ secrets.GOLDEN_PATH_IAC_PRIVATE_DEPLOY_KEY }}
 ```
+
+## Agent plugin
+
+This repository is also an [Agent Plugins](https://agent-plugins.org/) plugin. The manifest is `plugin.json`, and `skills/` holds [Agent Skills](https://agentskills.io/) for repositories that call the workflow.
+
+| Skill                       | What it does                                                                                                                                  |
+|-----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| `terraform-drift-detection` | Adds the `schedule` trigger and the report job from [scheduled drift detection](#scheduled-drift-detection) to the workflow that calls this one. |
+
+Install it in Claude Code with:
+
+```
+/plugin marketplace add oslokommune/reusable-terraform-pr
+/plugin install reusable-terraform-pr@reusable-terraform-pr
+```
+
+Then open the repository that runs the plan workflow and ask it to "set up drift detection". Agents that read Agent Skills without a plugin manager can load `skills/terraform-drift-detection/SKILL.md` directly.
