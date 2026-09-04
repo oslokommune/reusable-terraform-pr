@@ -1,0 +1,15 @@
+{
+  "name": "reusable-terraform-pr",
+  "description": "Skills for repositories that call the oslokommune/reusable-terraform-pr workflow.",
+  "owner": {
+    "name": "Oslo kommune",
+    "url": "https://github.com/oslokommune"
+  },
+  "plugins": [
+    {
+      "name": "reusable-terraform-pr",
+      "source": "./",
+      "description": "Skills for repositories that run Terraform plans with the oslokommune/reusable-terraform-pr workflow."
+    }
+  ]
+}
