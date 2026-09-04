@@ -97,63 +97,27 @@ jobs:
 
 ### Scheduled drift detection
 
-Add a `schedule` trigger to detect drift between the Terraform code on the default branch and the infrastructure it describes. Requires `>= v2.0.0`.
-
-Use a separate caller workflow for this. Scheduled runs have different failure semantics than PR runs: on a PR, a plan with changes is the expected outcome, while on a schedule it means the infrastructure no longer matches the code.
-
-Stack discovery is diff-based, and a scheduled run has no diff to compare against. On `schedule` and `workflow_dispatch` events, an empty `selected-stacks` therefore means every stack in the repository, so the caller does not have to list them. Set `selected-stacks` to narrow the run to a subset.
-
-`.github/workflows/terraform-drift.yml`:
+Add a `schedule` trigger to the workflow that runs on pull requests. On a schedule there is no diff to discover stacks from, so an empty `selected-stacks` plans every stack in the repository. A plan with changes then means the infrastructure no longer matches the code on the default branch.
 
 ```yaml
-name: "Terraform drift"
-
 on:
+  pull_request:
+  issue_comment:
+    types: [edited]
   schedule:
     # 03:00 UTC, Monday through Friday. Cron schedules are always UTC.
     - cron: "0 3 * * 1-5"
-  workflow_dispatch:
-
-jobs:
-  plan:
-    uses: oslokommune/reusable-terraform-pr/.github/workflows/reusable-terraform-pr.yml@v2
-    secrets:
-      ssh-private-key: ${{ secrets.GOLDEN_PATH_IAC_PRIVATE_DEPLOY_KEY }}
-
-  notify:
-    name: Notify on drift
-    needs: plan
-    # Alert on drift even when some other stack failed to plan. has-changes only
-    # counts stacks whose plan succeeded. A failed plan fails the run on its own.
-    if: ${{ !cancelled() && needs.plan.outputs.has-changes == 'true' }}
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Fail the run to report drift
-        env:
-          STACK_RESULTS: ${{ needs.plan.outputs.stack-results }}
-        run: |
-          drifted="$(echo "$STACK_RESULTS" | jq -r 'to_entries[] | select(.value.hasChanges) | .key' | paste -sd ' ' -)"
-          failed="$(echo "$STACK_RESULTS" | jq -r 'to_entries[] | select(.value.success | not) | .key' | paste -sd ' ' -)"
-          echo "::error title=Drift detected::Stacks with changes: ${drifted}. Stacks that failed to plan: ${failed:-none}. See the summary of the plan jobs."
-          exit 1
 ```
 
-Failing the `notify` job makes the scheduled run show up as red, which GitHub notifies watchers of. The error annotation names the drifted stacks, so the run page says what changed without opening the job summary. No Slack integration and no extra secrets are needed.
+The reusable workflow only plans. A `report` job in the caller, run on `schedule` events only, reads `stack-results` and fails the run when:
 
-Things worth knowing:
+- a stack has changes, which is drift
+- a plan failed, which means drift is unknown for that stack
 
-- **Requires `>= v2.0.0`.** Earlier versions ignore `schedule` events: every job is skipped, nothing is planned, and the run still reports success. Pin the caller accordingly, so that a green run means "no drift" rather than "never ran".
-- **A failed plan is not drift.** It means drift is unknown for that stack. `has-changes` only counts stacks whose plan succeeded, so the `notify` job still alerts on drift in the other stacks. `stack-results` names the failed stacks separately, with `success: false`. Do not guard it with `needs.plan.result == 'success'`: one permanently broken stack would then suppress every drift alert. The `plan` job fails on its own when a plan fails, so the run is red either way.
-- **Use `ignored-stacks` for stacks that always fail or always differ.** Some stacks fail to plan for reasons unrelated to drift, such as a provider that no longer runs. Others show a diff on every plan, such as a `null_resource` with a timestamp trigger. Either kind makes the scheduled run red forever. Exclude them until they are fixed:
+The report job does not depend on the plan job succeeding, so one broken stack does not hide drift in the others. Stacks that always have changes, such as a service scaled outside Terraform, are listed in the report job as expected changes and skipped. They are still planned and shown in the summary. Use `ignored-stacks` for stacks that should not be planned at all.
 
-  ```yaml
-      with:
-        ignored-stacks: |
-          stacks/dev/slackbot
-          stacks/*/legacy-*
-  ```
-
-- **Alerts repeat.** The run fails every night until the drift is either applied or removed from the code. A red run that is the normal state stops getting attention, so deal with drift quickly or ignore the stack explicitly.
+> [!TIP]
+> [pirates-iac](https://github.com/oslokommune/pirates-iac/blob/main/.github/workflows/terraform-pr.yml) has a complete workflow with the `schedule` trigger and the report job. Copy it and adjust the list of expected changes.
 
 ### With automerge
 
