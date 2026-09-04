@@ -13,6 +13,18 @@
         { "type": "deps", "section": "Dependency Updates" },
         { "type": "perf", "section": "Performance Improvements" },
         { "type": "revert", "section": "Reverts" }
+      ],
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": ".claude-plugin/plugin.json",
+          "jsonpath": "$.version"
+        }
       ]
     }
   }
