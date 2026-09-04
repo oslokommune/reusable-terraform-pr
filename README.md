@@ -36,7 +36,7 @@ jobs:
 | Name                 | Type    | Default         | Description                                                                                                                                                        |
 |----------------------|---------|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `config-file`        | string  | `.gp.cicd.json` | Path to CI/CD configuration file                                                                                                                                   |
-| `selected-stacks`    | string  | `""`            | Comma/newline-delimited list of stack patterns to plan (e.g., `stacks/dev/{dns,iam}`, `stacks/dev/app-*`). By default, only stacks with changed files are planned. Required on `schedule` events. |
+| `selected-stacks`    | string  | `""`            | Comma/newline-delimited list of stack patterns to plan (e.g., `stacks/dev/{dns,iam}`, `stacks/dev/app-*`). By default, only stacks with changed files are planned. On `schedule` and `workflow_dispatch` events the default is every stack in the repository (`**`). |
 | `ignored-stacks`     | string  | `""`            | Comma/newline-delimited list of stack patterns to always ignore.                                                                                                   |
 | `pr-automerge`       | boolean | `false`         | Whether to evaluate Renovate PRs for automerge eligibility based on upgrade type and Terraform plan results.                                                       |
 | `pr-automerge-rules` | string  | `[]`            | JSON array of rules with pattern matching and per-update-type policies. Only used when `pr-automerge` is enabled. See [automerge](#with-automerge) for details.    |
@@ -52,7 +52,7 @@ jobs:
 
 ### With manual trigger
 
-Add `workflow_dispatch` to allow manually running plans for specific stacks.
+Add `workflow_dispatch` to allow manually running plans for specific stacks. Leave `selected-stacks` empty to plan every stack in the repository.
 
 ```yaml
 name: "Terraform PR"
@@ -64,8 +64,8 @@ on:
   workflow_dispatch:
     inputs:
       selected-stacks:
-        description: 'Stacks to plan (e.g., "stacks/dev/{dns,iam}", "stacks/dev/app-*", "stacks/**")'
-        required: true
+        description: 'Stacks to plan (e.g., "stacks/dev/{dns,iam}", "stacks/dev/app-*"). Empty plans every stack.'
+        required: false
         type: string
 
 jobs:
@@ -83,7 +83,7 @@ Add a `schedule` trigger to detect drift between the Terraform code on the defau
 
 Use a separate caller workflow for this. Scheduled runs have different failure semantics than PR runs: on a PR, a plan with changes is the expected outcome, while on a schedule it means the infrastructure no longer matches the code.
 
-`selected-stacks` is required on `schedule` events. Stack discovery is diff-based, and a scheduled run has no diff to compare against, so the workflow fails instead of silently planning nothing. Adapt the glob to the layout of your repository.
+Stack discovery is diff-based, and a scheduled run has no diff to compare against. On `schedule` and `workflow_dispatch` events, an empty `selected-stacks` therefore means every stack in the repository, so the caller does not have to list them. Set `selected-stacks` to narrow the run to a subset.
 
 `.github/workflows/terraform-drift.yml`:
 
@@ -99,8 +99,6 @@ on:
 jobs:
   plan:
     uses: oslokommune/reusable-terraform-pr/.github/workflows/reusable-terraform-pr.yml@v1
-    with:
-      selected-stacks: "stacks/**"
     secrets:
       ssh-private-key: ${{ secrets.GOLDEN_PATH_IAC_PRIVATE_DEPLOY_KEY }}
 
@@ -131,7 +129,6 @@ Things worth knowing:
 
   ```yaml
       with:
-        selected-stacks: "stacks/**"
         ignored-stacks: |
           stacks/dev/slackbot
           stacks/*/legacy-*
