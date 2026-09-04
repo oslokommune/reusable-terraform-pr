@@ -755,6 +755,9 @@ jobs:
           stack_severities="$(echo "$stack_results" | jq -c 'with_entries(select(.value.success) | .value |= .changeSeverity)')"
           echo "stack-severities=$stack_severities" >> "$GITHUB_OUTPUT"
 
+          # TODO(demo): revert before merge - severity visibility for manual test PRs
+          printf 'Stack results:\n\n```json\n%s\n```\n' "$(echo "$stack_results" | jq .)" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Write to job summary
         if: ${{ github.event_name != 'pull_request' }}
         env:
@@ -813,12 +816,11 @@ jobs:
             && needs.summarize.outputs.success == 'true'
             && github.event.pull_request.commits == 1
           }}
-        uses: oslokommune/composite-actions/evaluate-automerge@55ee2c7bef4b80f4535761f03b8f3d07e064836f # evaluate-automerge-v1.0.2
+        # TODO(demo): revert before merge - unreleased action branch, fed severities
+        uses: oslokommune/composite-actions/evaluate-automerge@feat/evaluate-automerge-change-categories
         with:
           rules: ${{ inputs.pr-automerge-rules }}
-          # Expand-contract: switch to stack-severities when bumping to an
-          # evaluate-automerge version that consumes change severities.
-          stack-changes: ${{ needs.summarize.outputs.stack-changes }}
+          stack-severities: ${{ needs.summarize.outputs.stack-severities }}
 
       - name: Set automerge label
         if: ${{ always() }}
@@ -828,11 +830,14 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           AUTOMERGE: ${{ steps.evaluate.outputs.automerge }}
         run: |
-          # Label needs to exist in repository before trying to attach it to a PR
-          gh label create --force --color "0E8A16" --description "Renovate will merge PRs with this label automatically" "automerge"
+          # TODO(demo): revert before merge - "would-automerge" signals the decision
+          # without triggering the Renovate automerge scheduler; the real label is
+          # scrubbed so nothing on this PR is actionable.
+          echo "Automerge decision: ${AUTOMERGE:-not evaluated}" >> "$GITHUB_STEP_SUMMARY"
+          gh label create --force --color "FBCA04" --description "Demo: this PR would have been automerged" "would-automerge"
+          gh pr edit "$PR_NUMBER" --remove-label "automerge" || true
           if [ "$AUTOMERGE" = "true" ]; then
-            gh pr edit "$PR_NUMBER" --add-label "automerge"
+            gh pr edit "$PR_NUMBER" --add-label "would-automerge"
           else
-            # If we can't automerge, remove any existing (and outdated) label
-            gh pr edit "$PR_NUMBER" --remove-label "automerge"
+            gh pr edit "$PR_NUMBER" --remove-label "would-automerge"
           fi
