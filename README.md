@@ -43,12 +43,46 @@ jobs:
 
 ### Outputs
 
-| Name            | Type                 | Description                                                                                                          |
-|-----------------|----------------------|----------------------------------------------------------------------------------------------------------------------|
-| `success`       | boolean              | Whether all Terraform plans succeeded                                                                                |
-| `has-changes`   | boolean              | Whether any stack had changes                                                                                        |
-| `stacks`        | string (JSON array)  | JSON array of all stacks that were planned                                                                           |
-| `stack-changes` | string (JSON object) | Maps each stack whose plan succeeded to whether it had changes, e.g. `{"stacks/dev/app": true, "stacks/prod/app": false}` |
+| Name            | Type                 | Description                                                                                                                                                              |
+|-----------------|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `success`       | boolean              | Whether all Terraform plans succeeded                                                                                                                                    |
+| `has-changes`   | boolean              | Whether any stack had changes                                                                                                                                            |
+| `stacks`        | string (JSON array)  | JSON array of all stacks that were planned                                                                                                                               |
+| `stack-results` | string (JSON object) | Maps each planned stack to its result: `success`, `hasChanges`, `summary` and `url`. `hasChanges` is `null` when the plan failed. See [stack results](#stack-results). |
+
+#### Stack results
+
+`stack-results` is keyed by stack path. Each value has the same four fields:
+
+```json
+{
+  "stacks/dev/app": {
+    "success": true,
+    "hasChanges": true,
+    "summary": "1 to add, 0 to change, 0 to destroy",
+    "url": "https://github.com/org/repo/pull/12#issuecomment-345"
+  },
+  "stacks/prod/app": {
+    "success": true,
+    "hasChanges": false,
+    "summary": "No changes",
+    "url": "https://github.com/org/repo/pull/12#issuecomment-346"
+  },
+  "stacks/dev/slackbot": {
+    "success": false,
+    "hasChanges": null,
+    "summary": "Plan failed",
+    "url": "https://github.com/org/repo/actions/runs/1/job/2"
+  }
+}
+```
+
+- `success`: whether `terraform plan` succeeded for the stack.
+- `hasChanges`: whether the plan had changes. `null` when the plan failed, since drift is then unknown.
+- `summary`: the one-line plan summary, `No changes`, or `Plan failed`.
+- `url`: the plan comment on a pull request, otherwise the plan job.
+
+Select stacks with `jq`, for example `to_entries[] | select(.value.hasChanges) | .key` for stacks with changes, or `select(.value.success | not)` for failed plans.
 
 ### With manual trigger
 
@@ -112,10 +146,11 @@ jobs:
     steps:
       - name: Fail the run to report drift
         env:
-          STACK_CHANGES: ${{ needs.plan.outputs.stack-changes }}
+          STACK_RESULTS: ${{ needs.plan.outputs.stack-results }}
         run: |
-          drifted="$(echo "$STACK_CHANGES" | jq -r 'to_entries[] | select(.value) | .key' | paste -sd ' ' -)"
-          echo "::error title=Drift detected::Stacks with changes: ${drifted}. See the summary of the plan jobs."
+          drifted="$(echo "$STACK_RESULTS" | jq -r 'to_entries[] | select(.value.hasChanges) | .key' | paste -sd ' ' -)"
+          failed="$(echo "$STACK_RESULTS" | jq -r 'to_entries[] | select(.value.success | not) | .key' | paste -sd ' ' -)"
+          echo "::error title=Drift detected::Stacks with changes: ${drifted}. Stacks that failed to plan: ${failed:-none}. See the summary of the plan jobs."
           exit 1
 ```
 
@@ -124,7 +159,7 @@ Failing the `notify` job makes the scheduled run show up as red, which GitHub no
 Things worth knowing:
 
 - **Requires `>= v1.7.0`.** Earlier versions ignore `schedule` events: every job is skipped, nothing is planned, and the run still reports success. Pin the caller accordingly, so that a green run means "no drift" rather than "never ran".
-- **A failed plan is not drift.** It means drift is unknown for that stack. `has-changes` only counts stacks whose plan succeeded, so the `notify` job still alerts on drift in the other stacks. Do not guard it with `needs.plan.result == 'success'`: one permanently broken stack would then suppress every drift alert. The `plan` job fails on its own when a plan fails, so the run is red either way.
+- **A failed plan is not drift.** It means drift is unknown for that stack. `has-changes` only counts stacks whose plan succeeded, so the `notify` job still alerts on drift in the other stacks. `stack-results` names the failed stacks separately, with `success: false`. Do not guard it with `needs.plan.result == 'success'`: one permanently broken stack would then suppress every drift alert. The `plan` job fails on its own when a plan fails, so the run is red either way.
 - **Use `ignored-stacks` for stacks that always fail or always differ.** Some stacks fail to plan for reasons unrelated to drift, such as a provider that no longer runs. Others show a diff on every plan, such as a `null_resource` with a timestamp trigger. Either kind makes the scheduled run red forever. Exclude them until they are fixed:
 
   ```yaml
