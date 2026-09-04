@@ -38,9 +38,6 @@ on:
       has-changes:
         description: "Whether any stack had changes"
         value: ${{ jobs.summarize.outputs.has-changes == 'true' }}
-      stacks:
-        description: "JSON array of all stacks that were planned"
-        value: ${{ jobs.determine-changed-stacks.outputs.all-stacks }}
       stack-results:
         description: 'JSON object mapping each planned stack to its result: {success: bool, hasChanges: bool | null}. hasChanges is null when the plan failed, since drift is then unknown. E.g. {"stacks/dev/app": {"success": true, "hasChanges": true}, "stacks/dev/broken": {"success": false, "hasChanges": null}}'
         value: ${{ jobs.summarize.outputs.stack-results }}

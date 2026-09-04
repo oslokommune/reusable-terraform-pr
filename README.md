@@ -16,7 +16,7 @@ on:
 
 jobs:
   plan:
-    uses: oslokommune/reusable-terraform-pr/.github/workflows/reusable-terraform-pr.yml@v1
+    uses: oslokommune/reusable-terraform-pr/.github/workflows/reusable-terraform-pr.yml@v2
     secrets:
       ssh-private-key: ${{ secrets.GOLDEN_PATH_IAC_PRIVATE_DEPLOY_KEY }}
 ```
@@ -47,7 +47,6 @@ jobs:
 |-----------------|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `success`       | boolean              | Whether all Terraform plans succeeded                                                                                                                                    |
 | `has-changes`   | boolean              | Whether any stack had changes                                                                                                                                            |
-| `stacks`        | string (JSON array)  | JSON array of all stacks that were planned                                                                                                                               |
 | `stack-results` | string (JSON object) | Maps each planned stack to `success` and `hasChanges`. `hasChanges` is `null` when the plan failed. See [stack results](#stack-results).                                 |
 
 #### Stack results
@@ -64,6 +63,8 @@ jobs:
 
 - `success`: whether `terraform plan` succeeded for the stack.
 - `hasChanges`: whether the plan had changes. `null` when the plan failed, since drift is then unknown.
+
+The keys are the planned stacks, so `keys` gives the full list.
 
 Select stacks with `jq`, for example `to_entries[] | select(.value.hasChanges) | .key` for stacks with changes, or `select(.value.success | not)` for failed plans.
 
@@ -87,7 +88,7 @@ on:
 
 jobs:
   plan:
-    uses: oslokommune/reusable-terraform-pr/.github/workflows/reusable-terraform-pr.yml@v1
+    uses: oslokommune/reusable-terraform-pr/.github/workflows/reusable-terraform-pr.yml@v2
     with:
       selected-stacks: ${{ inputs.selected-stacks }}
     secrets:
@@ -96,7 +97,7 @@ jobs:
 
 ### Scheduled drift detection
 
-Add a `schedule` trigger to detect drift between the Terraform code on the default branch and the infrastructure it describes. Requires `>= v1.7.0`.
+Add a `schedule` trigger to detect drift between the Terraform code on the default branch and the infrastructure it describes. Requires `>= v2.0.0`.
 
 Use a separate caller workflow for this. Scheduled runs have different failure semantics than PR runs: on a PR, a plan with changes is the expected outcome, while on a schedule it means the infrastructure no longer matches the code.
 
@@ -115,7 +116,7 @@ on:
 
 jobs:
   plan:
-    uses: oslokommune/reusable-terraform-pr/.github/workflows/reusable-terraform-pr.yml@v1
+    uses: oslokommune/reusable-terraform-pr/.github/workflows/reusable-terraform-pr.yml@v2
     secrets:
       ssh-private-key: ${{ secrets.GOLDEN_PATH_IAC_PRIVATE_DEPLOY_KEY }}
 
@@ -141,7 +142,7 @@ Failing the `notify` job makes the scheduled run show up as red, which GitHub no
 
 Things worth knowing:
 
-- **Requires `>= v1.7.0`.** Earlier versions ignore `schedule` events: every job is skipped, nothing is planned, and the run still reports success. Pin the caller accordingly, so that a green run means "no drift" rather than "never ran".
+- **Requires `>= v2.0.0`.** Earlier versions ignore `schedule` events: every job is skipped, nothing is planned, and the run still reports success. Pin the caller accordingly, so that a green run means "no drift" rather than "never ran".
 - **A failed plan is not drift.** It means drift is unknown for that stack. `has-changes` only counts stacks whose plan succeeded, so the `notify` job still alerts on drift in the other stacks. `stack-results` names the failed stacks separately, with `success: false`. Do not guard it with `needs.plan.result == 'success'`: one permanently broken stack would then suppress every drift alert. The `plan` job fails on its own when a plan fails, so the run is red either way.
 - **Use `ignored-stacks` for stacks that always fail or always differ.** Some stacks fail to plan for reasons unrelated to drift, such as a provider that no longer runs. Others show a diff on every plan, such as a `null_resource` with a timestamp trigger. Either kind makes the scheduled run red forever. Exclude them until they are fixed:
 
@@ -175,7 +176,7 @@ on:
 
 jobs:
   plan:
-    uses: oslokommune/reusable-terraform-pr/.github/workflows/reusable-terraform-pr.yml@v1
+    uses: oslokommune/reusable-terraform-pr/.github/workflows/reusable-terraform-pr.yml@v2
     with:
       pr-automerge: true
       pr-automerge-rules: |
