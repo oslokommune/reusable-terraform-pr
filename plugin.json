@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "reusable-terraform-pr",
+  "version": "1.7.0",
+  "description": "Skills for repositories that run Terraform plans with the oslokommune/reusable-terraform-pr workflow.",
+  "author": {
+    "name": "Oslo kommune",
+    "url": "https://github.com/oslokommune"
+  },
+  "homepage": "https://github.com/oslokommune/reusable-terraform-pr",
+  "repository": "https://github.com/oslokommune/reusable-terraform-pr",
+  "keywords": ["terraform", "github-actions", "drift-detection"]
+}
