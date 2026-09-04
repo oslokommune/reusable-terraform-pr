@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.6.3...v1.7.0) (2026-09-04)
+
+
+### Features
+
+* support scheduled drift detection ([#35](https://github.com/oslokommune/reusable-terraform-pr/issues/35)) ([72aa8bb](https://github.com/oslokommune/reusable-terraform-pr/commit/72aa8bbc71b958be5560a92e385d279a78213e0f))
+
 ## [1.6.3](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.6.2...v1.6.3) (2026-08-28)
 
 
