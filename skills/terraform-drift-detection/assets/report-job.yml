@@ -1,0 +1,80 @@
+# Add this job next to the job that calls the reusable workflow. Change
+# `needs: plan` if that job has another id.
+  report:
+    name: "Report drift and failed plans"
+    needs: plan
+    # Only scheduled runs are drift detection. A plan with changes on a pull
+    # request is the point of the pull request, not drift.
+    #
+    # Run even when the plan job failed. A failed plan means "drift unknown" for
+    # that stack and is reported here by name, next to the stacks that drifted.
+    # Do not guard on needs.plan.result: one broken stack would then hide drift
+    # in every other stack.
+    if: ${{ !cancelled() && github.event_name == 'schedule' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Fail the run on drift or a failed plan
+        shell: bash
+        env:
+          # JSON object from stack path to {success, hasChanges}. hasChanges is
+          # null when the plan failed.
+          STACK_RESULTS: ${{ needs.plan.outputs.stack-results }}
+          # Stacks whose plan always has changes, so their changes are not
+          # drift. They are still planned and shown in the summary. One bash
+          # glob per line, matched against the stack path. Say why each stack
+          # always has changes, so the entry can be removed once the cause is
+          # fixed. A failed plan in one of these stacks is still reported.
+          #
+          # Example:
+          #   # The ECS desired count is changed by autoscaling outside Terraform.
+          #   stacks/*/app-hello-world
+          EXPECTED_CHANGES: |
+        run: |
+          if [ -z "$STACK_RESULTS" ]; then
+            echo "::warning title=Nothing planned::No stacks were planned, so drift is unknown. Check the selected stacks."
+            exit 0
+          fi
+
+          patterns="$(echo "$EXPECTED_CHANGES" | sed -E 's/#.*//; s/^[[:space:]]+//; s/[[:space:]]+$//')"
+
+          failed=()
+          for stack in $(echo "$STACK_RESULTS" | jq -r 'to_entries[] | select(.value.success | not) | .key'); do
+            failed+=("$stack")
+          done
+
+          drifted=()
+          ignored=()
+          for stack in $(echo "$STACK_RESULTS" | jq -r 'to_entries[] | select(.value.hasChanges) | .key'); do
+            matched="false"
+            while read -r pattern; do
+              [ -n "$pattern" ] || continue
+              # shellcheck disable=SC2053 # the pattern is a glob on purpose
+              if [[ "$stack" == $pattern ]]; then
+                matched="true"
+                break
+              fi
+            done <<< "$patterns"
+            if [ "$matched" = "true" ]; then
+              ignored+=("$stack")
+            else
+              drifted+=("$stack")
+            fi
+          done
+
+          if [ ${#ignored[@]} -gt 0 ]; then
+            echo "::notice title=Expected changes ignored::Stacks with expected changes: ${ignored[*]}."
+          fi
+
+          status=0
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "::error title=Plan failed::Stacks that failed to plan, so their drift is unknown: ${failed[*]}. See the logs of the plan jobs."
+            status=1
+          fi
+          if [ ${#drifted[@]} -gt 0 ]; then
+            echo "::error title=Drift detected::Stacks with changes: ${drifted[*]}. See the summary of the plan jobs."
+            status=1
+          fi
+          if [ "$status" -eq 0 ]; then
+            echo "No drift. Every plan succeeded, and every stack with changes is expected to have changes."
+          fi
+          exit "$status"
