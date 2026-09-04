@@ -10,7 +10,7 @@ on:
       selected-stacks:
         type: string
         default: ""
-        description: 'Comma/newline-delimited list of stack patterns to plan (e.g., "stacks/dev/{dns,iam}","stacks/dev/app-hello,stacks/prod/app-hello"). By default, only stacks with changed files are planned. Set "selected-stacks" to override this behavior. Required on "schedule" events, where there are no changed files to discover stacks from.'
+        description: 'Comma/newline-delimited list of stack patterns to plan (e.g., "stacks/dev/{dns,iam}","stacks/dev/app-hello,stacks/prod/app-hello"). By default, only stacks with changed files are planned. Set "selected-stacks" to override this behavior. On "schedule" and "workflow_dispatch" events there are no changed files, so the default is every stack in the repository ("**").'
         required: false
       ignored-stacks:
         type: string
@@ -117,19 +117,6 @@ jobs:
       all-dev-stacks: ${{ steps.determine.outputs.all-dev-stacks }}
       all-prod-stacks: ${{ steps.determine.outputs.all-prod-stacks }}
     steps:
-      # Stack discovery is diff based, and a scheduled run has no diff to compare
-      # against. Without "selected-stacks" it would find no stacks, plan nothing
-      # and still report success - which reads as "no drift".
-      - name: Require selected stacks on scheduled runs
-        if: ${{ github.event_name == 'schedule' }}
-        env:
-          SELECTED_STACKS: ${{ inputs.selected-stacks }}
-        run: |
-          if [ "$SELECTED_STACKS" == "" ]; then
-            echo "🚨The 'selected-stacks' input is required on 'schedule' events" >&2
-            exit 1
-          fi
-
       # determine-stacks requires code to be checked out in order to
       # find changed files
       - name: Checkout code
@@ -139,7 +126,17 @@ jobs:
         id: determine
         uses: oslokommune/composite-actions/determine-stacks@a050629d84616b1428f802f674a2fd41c3e8b68a # determine-stacks-v1.2.2
         with:
-          selected-stacks: ${{ inputs.selected-stacks }}
+          # Stack discovery is diff based. Scheduled and manually dispatched runs
+          # have no diff to compare against, so without "selected-stacks" they
+          # would find no stacks, plan nothing and still report success - which
+          # on a schedule reads as "no drift". Default to every stack in the
+          # repository instead. "ignored-stacks" still applies.
+          selected-stacks: >-
+            ${{
+              inputs.selected-stacks
+              || ((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '**')
+              || ''
+            }}
           ignored-stacks: ${{ inputs.ignored-stacks }}
 
       - name: Warn on no stacks found
