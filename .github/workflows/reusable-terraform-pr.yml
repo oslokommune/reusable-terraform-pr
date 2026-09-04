@@ -42,7 +42,7 @@ on:
         description: "JSON array of all stacks that were planned"
         value: ${{ jobs.determine-changed-stacks.outputs.all-stacks }}
       stack-results:
-        description: 'JSON object mapping each planned stack to its result: {success: bool, hasChanges: bool | null, summary: string, url: string}. hasChanges is null when the plan failed, since drift is then unknown. E.g. {"stacks/dev/app": {"success": true, "hasChanges": true, "summary": "1 to add, 0 to change, 0 to destroy", "url": "https://..."}}'
+        description: 'JSON object mapping each planned stack to its result: {success: bool, hasChanges: bool | null, summary: string}. hasChanges is null when the plan failed, since drift is then unknown. E.g. {"stacks/dev/app": {"success": true, "hasChanges": true, "summary": "1 to add, 0 to change, 0 to destroy"}}'
         value: ${{ jobs.summarize.outputs.stack-results }}
 
 # NOTE: Prevent concurrent runs for the same PR from causing a race condition on PR comments.
@@ -611,7 +611,7 @@ jobs:
           success="true"
           has_changes="false"
           # Per-stack results keyed by stack path, e.g.
-          # {"stacks/dev/app": {"success": true, "hasChanges": true, "summary": "1 to add, 0 to change, 0 to destroy", "url": "https://..."}}
+          # {"stacks/dev/app": {"success": true, "hasChanges": true, "summary": "1 to add, 0 to change, 0 to destroy"}}
           # A failed plan has success false and hasChanges null, since drift is unknown for it.
           stack_results="{}"
 
@@ -641,8 +641,7 @@ jobs:
               --argjson success "$stack_success" \
               --argjson has_changes "$stack_has_changes" \
               --arg summary "$plan_summary" \
-              --arg url "$plan_url" \
-              '. + {($stack): {success: $success, hasChanges: $has_changes, summary: $summary, url: $url}}')"
+              '. + {($stack): {success: $success, hasChanges: $has_changes, summary: $summary}}')"
 
             if [ "$plan_url" != "" ]; then
               summary="$(printf "%s\n|%s|%s|%s|\n" "$summary" "$emoji" "[\`$stack\`]($plan_url)" "$plan_summary")"

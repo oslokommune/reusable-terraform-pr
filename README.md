@@ -48,31 +48,28 @@ jobs:
 | `success`       | boolean              | Whether all Terraform plans succeeded                                                                                                                                    |
 | `has-changes`   | boolean              | Whether any stack had changes                                                                                                                                            |
 | `stacks`        | string (JSON array)  | JSON array of all stacks that were planned                                                                                                                               |
-| `stack-results` | string (JSON object) | Maps each planned stack to its result: `success`, `hasChanges`, `summary` and `url`. `hasChanges` is `null` when the plan failed. See [stack results](#stack-results). |
+| `stack-results` | string (JSON object) | Maps each planned stack to its result: `success`, `hasChanges` and `summary`. `hasChanges` is `null` when the plan failed. See [stack results](#stack-results).          |
 
 #### Stack results
 
-`stack-results` is keyed by stack path. Each value has the same four fields:
+`stack-results` is keyed by stack path. Each value has the same three fields:
 
 ```json
 {
   "stacks/dev/app": {
     "success": true,
     "hasChanges": true,
-    "summary": "1 to add, 0 to change, 0 to destroy",
-    "url": "https://github.com/org/repo/pull/12#issuecomment-345"
+    "summary": "1 to add, 0 to change, 0 to destroy"
   },
   "stacks/prod/app": {
     "success": true,
     "hasChanges": false,
-    "summary": "No changes",
-    "url": "https://github.com/org/repo/pull/12#issuecomment-346"
+    "summary": "No changes"
   },
   "stacks/dev/slackbot": {
     "success": false,
     "hasChanges": null,
-    "summary": "Plan failed",
-    "url": "https://github.com/org/repo/actions/runs/1/job/2"
+    "summary": "Plan failed"
   }
 }
 ```
@@ -80,7 +77,6 @@ jobs:
 - `success`: whether `terraform plan` succeeded for the stack.
 - `hasChanges`: whether the plan had changes. `null` when the plan failed, since drift is then unknown.
 - `summary`: the one-line plan summary, `No changes`, or `Plan failed`.
-- `url`: the plan comment on a pull request, otherwise the plan job.
 
 Select stacks with `jq`, for example `to_entries[] | select(.value.hasChanges) | .key` for stacks with changes, or `select(.value.success | not)` for failed plans.
 
