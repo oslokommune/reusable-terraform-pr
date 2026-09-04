@@ -10,7 +10,7 @@ on:
       selected-stacks:
         type: string
         default: ""
-        description: 'Comma/newline-delimited list of stack patterns to plan (e.g., "stacks/dev/{dns,iam}","stacks/dev/app-hello,stacks/prod/app-hello"). By default, only stacks with changed files are planned. Set "selected-stacks" to override this behavior.'
+        description: 'Comma/newline-delimited list of stack patterns to plan (e.g., "stacks/dev/{dns,iam}","stacks/dev/app-hello,stacks/prod/app-hello"). By default, only stacks with changed files are planned. Set "selected-stacks" to override this behavior. On "schedule" and "workflow_dispatch" events there are no changed files, so the default is every stack in the repository ("**").'
         required: false
       ignored-stacks:
         type: string
@@ -38,9 +38,9 @@ on:
       has-changes:
         description: "Whether any stack had changes"
         value: ${{ jobs.summarize.outputs.has-changes == 'true' }}
-      stacks:
-        description: "JSON array of all stacks that were planned"
-        value: ${{ jobs.determine-changed-stacks.outputs.all-stacks }}
+      stack-results:
+        description: 'JSON object mapping each planned stack to its result: {success: bool, hasChanges: bool | null}. hasChanges is null when the plan failed, since drift is then unknown. E.g. {"stacks/dev/app": {"success": true, "hasChanges": true}, "stacks/dev/broken": {"success": false, "hasChanges": null}}'
+        value: ${{ jobs.summarize.outputs.stack-results }}
 
 # NOTE: Prevent concurrent runs for the same PR from causing a race condition on PR comments.
 # Concurrent runs will find and write to the same comments, and this can result in
@@ -48,7 +48,8 @@ on:
 # failure while the individual plan comment shows success, or vice versa.
 concurrency:
   # We only enable concurrency control for pull request events. Runs triggered
-  # through workflow dispatch can run in parallel as they don't affect each other.
+  # through workflow dispatch or a schedule can run in parallel as they don't
+  # affect each other.
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   # We cancel in-progress concurrent runs immediately to get quicker feedback
   # and since the old plans are outdated anyway.
@@ -99,7 +100,9 @@ jobs:
   determine-changed-stacks:
     if: >-
       ${{
-        github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+        github.event_name == 'workflow_dispatch'
+        || github.event_name == 'pull_request'
+        || github.event_name == 'schedule'
       }}
     name: Determine stacks
     runs-on: ubuntu-24.04
@@ -120,7 +123,17 @@ jobs:
         id: determine
         uses: oslokommune/composite-actions/determine-stacks@55ee2c7bef4b80f4535761f03b8f3d07e064836f # determine-stacks-v1.2.3
         with:
-          selected-stacks: ${{ inputs.selected-stacks }}
+          # Stack discovery is diff based. Scheduled and manually dispatched runs
+          # have no diff to compare against, so without "selected-stacks" they
+          # would find no stacks, plan nothing and still report success - which
+          # on a schedule reads as "no drift". Default to every stack in the
+          # repository instead. "ignored-stacks" still applies.
+          selected-stacks: >-
+            ${{
+              inputs.selected-stacks
+              || ((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '**')
+              || ''
+            }}
           ignored-stacks: ${{ inputs.ignored-stacks }}
 
       - name: Warn on no stacks found
@@ -554,6 +567,8 @@ jobs:
     outputs:
       success: ${{ steps.summary.outputs.success == 'true' }}
       has-changes: ${{ steps.summary.outputs.has-changes == 'true' }}
+      stack-results: ${{ steps.summary.outputs.stack-results }}
+      # Consumed by the automerge job. Derived from stack-results.
       stack-changes: ${{ steps.summary.outputs.stack-changes }}
     steps:
       - name: Download artifacts
@@ -592,20 +607,23 @@ jobs:
 
           success="true"
           has_changes="false"
-          # Per-stack change map, e.g. {"stacks/dev/app": true, "stacks/prod/app": false}.
-          # Used by automerge evaluation to check policies per stack.
-          stack_changes="{}"
+          # Per-stack results keyed by stack path, e.g.
+          # {"stacks/dev/app": {"success": true, "hasChanges": true}, "stacks/dev/broken": {"success": false, "hasChanges": null}}
+          # A failed plan has success false and hasChanges null, since drift is unknown for it.
+          stack_results="{}"
 
           for summary_file in summaries/*.json; do
             emoji="❌"
             stack="$(jq -r -e '.stack' "$summary_file")"
             plan_url="$(jq -r '.planUrl' "$summary_file")"
             plan_summary="$(jq -r -e '.summary' "$summary_file")"
+            stack_success="false"
+            stack_has_changes="null"
 
             if "$(jq -e '.jobStatus == "success"' "$summary_file")"; then
               emoji="🟩"
+              stack_success="true"
               stack_has_changes="$(jq -r '.hasChanges' "$summary_file")"
-              stack_changes="$(echo "$stack_changes" | jq -c --arg stack "$stack" --argjson changes "$stack_has_changes" '. + {($stack): $changes}')"
               if "$stack_has_changes"; then
                 emoji="🟧"
                 has_changes="true"
@@ -614,6 +632,12 @@ jobs:
               plan_summary="Plan failed"
               success="false"
             fi
+
+            stack_results="$(echo "$stack_results" | jq -c \
+              --arg stack "$stack" \
+              --argjson success "$stack_success" \
+              --argjson has_changes "$stack_has_changes" \
+              '. + {($stack): {success: $success, hasChanges: $has_changes}}')"
 
             if [ "$plan_url" != "" ]; then
               summary="$(printf "%s\n|%s|%s|%s|\n" "$summary" "$emoji" "[\`$stack\`]($plan_url)" "$plan_summary")"
@@ -657,6 +681,11 @@ jobs:
           echo "file=/tmp/summary.md" >> "$GITHUB_OUTPUT"
           echo "success=$success" >> "$GITHUB_OUTPUT"
           echo "has-changes=$has_changes" >> "$GITHUB_OUTPUT"
+          echo "stack-results=$stack_results" >> "$GITHUB_OUTPUT"
+
+          # Automerge evaluation expects a map from stack to whether it had changes,
+          # limited to stacks whose plan succeeded, e.g. {"stacks/dev/app": true}.
+          stack_changes="$(echo "$stack_results" | jq -c 'with_entries(select(.value.success) | .value |= .hasChanges)')"
           echo "stack-changes=$stack_changes" >> "$GITHUB_OUTPUT"
 
       - name: Write to job summary
