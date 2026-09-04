@@ -39,7 +39,7 @@ on:
         description: "Whether any stack had changes"
         value: ${{ jobs.summarize.outputs.has-changes == 'true' }}
       stack-results:
-        description: 'JSON object mapping each planned stack to its result: {success: bool, hasChanges: bool | null}. hasChanges is null when the plan failed, since drift is then unknown. E.g. {"stacks/dev/app": {"success": true, "hasChanges": true}, "stacks/dev/broken": {"success": false, "hasChanges": null}}'
+        description: 'JSON object mapping each planned stack to its result: {success: bool, hasChanges: bool | null, changeSeverity: string}. hasChanges is null when the plan failed, since drift is then unknown. changeSeverity is the most severe kind of change the plan contains: "no-changes" < "additive" < "no-destroy" < "any-changes"; "unknown" (unclassifiable, e.g. a failed plan) blocks automerge. E.g. {"stacks/dev/app": {"success": true, "hasChanges": true, "changeSeverity": "additive"}, "stacks/dev/broken": {"success": false, "hasChanges": null, "changeSeverity": "unknown"}}'
         value: ${{ jobs.summarize.outputs.stack-results }}
 
 # NOTE: Prevent concurrent runs for the same PR from causing a race condition on PR comments.
@@ -394,6 +394,56 @@ jobs:
           else
             tf_summary="$TF_FAILURE_OUTPUT"
           fi
+
+          # Extract structured plan summary if successful, set change severity
+          # Default/Fallback is "unknown" for any parsing failure, or unknown actions in plan (such as forget, or create forget)
+          # Follows the priority unknown->any-changes->no-destroy->additive, defaults to the highest priority
+          change_severity="unknown"
+          plan_json="$RUNNER_TEMP/plan.json"
+          if [ "$PLAN_OUTCOME" = "success" ] && terraform show -json "$PLAN_FILE" > "$plan_json"; then
+            # Get unique actions. A replace contributes both "delete" and "create".
+            actions="$(jq '[.resource_changes[]?.change.actions] | flatten | unique' "$plan_json")"
+
+            # A resource verb we do not know how to rank
+            if jq -e 'any(.[]?; IN("no-op", "read", "create", "update", "delete") | not)' <<<"$actions" >/dev/null; then
+              change_severity="unknown"
+
+            # An output verb we don't know how to rank
+            elif jq -e '.output_changes // {} | any(.[].actions[]?; IN("no-op", "create", "update", "delete") | not)' "$plan_json" >/dev/null; then
+              change_severity="unknown"
+
+            # A resource destroyed
+            elif jq -e 'index("delete")' <<<"$actions" >/dev/null; then
+              change_severity="any-changes"
+
+            # In place resource update
+            elif jq -e 'index("update")' <<<"$actions" >/dev/null; then
+              change_severity="no-destroy"
+
+            # An output is updated or deleted
+            elif jq -e '.output_changes // {} | any(.[].actions[]?; IN("update", "delete"))' "$plan_json" >/dev/null; then
+              change_severity="no-destroy"
+
+            # A resource is created
+            elif jq -e 'index("create")' <<<"$actions" >/dev/null; then
+              change_severity="additive"
+
+            # An output is created
+            elif jq -e '.output_changes // {} | any(.[]; .actions | index("create"))' "$plan_json" >/dev/null; then
+              change_severity="additive"
+
+            # Verify emptiness, the early exits has caught everything we thought about up front
+            elif jq -e '(. - ["no-op", "read"]) == []' <<<"$actions" >/dev/null \
+              && jq -e '.output_changes // {} | all(.[].actions[]?; . == "no-op")' "$plan_json" >/dev/null; then
+              change_severity="no-changes"
+
+            # We do not merge if there is anything we missed.
+            else
+              echo "::warning title=Classify plan::unclassified changes in $STACK - blocking automerge"
+              change_severity="unknown"
+            fi
+          fi
+
           # Extract plan summary if successful
           if [ "$PLAN_OUTCOME" = "success" ]; then
             code_block_syntax="terraform"
@@ -485,6 +535,7 @@ jobs:
           EOF
 
           echo "result=$plan_summary" >> "$GITHUB_OUTPUT"
+          echo "change-severity=$change_severity" >> "$GITHUB_OUTPUT"
 
       - name: Find Terraform plan comment
         if: ${{ github.event_name == 'pull_request' }}
@@ -516,6 +567,8 @@ jobs:
           STACK: ${{ matrix.stack }}
           JOB_STATUS: ${{ job.status }}
           HAS_CHANGES: ${{ steps.plan-summary.outputs.result != 'No changes' }}
+          # Fail safe: an empty severity (plan-summary step did not run) blocks automerge
+          CHANGE_SEVERITY: ${{ steps.plan-summary.outputs.change-severity || 'unknown' }}
           SUMMARY: ${{ steps.plan-summary.outputs.result }}
           # Prefer comment URL for PRs, fall back to job URL
           PLAN_URL: >-
@@ -529,10 +582,11 @@ jobs:
           summary="$(jq --compact-output --null-input \
             --arg stack "$STACK" \
             --argjson has_changes "$HAS_CHANGES" \
+            --arg change_severity "$CHANGE_SEVERITY" \
             --arg job_status "$JOB_STATUS" \
             --arg summary "$SUMMARY" \
             --arg planUrl "$PLAN_URL" \
-            '{stack: $stack, hasChanges: $has_changes, jobStatus: $job_status, summary: $summary, planUrl: $planUrl}'
+            '{stack: $stack, hasChanges: $has_changes, changeSeverity: $change_severity, jobStatus: $job_status, summary: $summary, planUrl: $planUrl}'
           )"
 
           artifact_name="summary-$(echo "$STACK" | sed 's/[^a-zA-Z0-9-]/-/g' | sed 's/--/-/g')"
@@ -570,6 +624,9 @@ jobs:
       stack-results: ${{ steps.summary.outputs.stack-results }}
       # Consumed by the automerge job. Derived from stack-results.
       stack-changes: ${{ steps.summary.outputs.stack-changes }}
+      # Expand-contract: stack-severities will replace the boolean stack-changes
+      # once the automerge evaluation consumes change severities.
+      stack-severities: ${{ steps.summary.outputs.stack-severities }}
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -608,8 +665,9 @@ jobs:
           success="true"
           has_changes="false"
           # Per-stack results keyed by stack path, e.g.
-          # {"stacks/dev/app": {"success": true, "hasChanges": true}, "stacks/dev/broken": {"success": false, "hasChanges": null}}
+          # {"stacks/dev/app": {"success": true, "hasChanges": true, "changeSeverity": "additive"}, "stacks/dev/broken": {"success": false, "hasChanges": null, "changeSeverity": "unknown"}}
           # A failed plan has success false and hasChanges null, since drift is unknown for it.
+          # changeSeverity ranks no-changes < additive < no-destroy < any-changes; "unknown" blocks automerge.
           stack_results="{}"
 
           for summary_file in summaries/*.json; do
@@ -619,6 +677,8 @@ jobs:
             plan_summary="$(jq -r -e '.summary' "$summary_file")"
             stack_success="false"
             stack_has_changes="null"
+            # Fail safe: a summary file without a severity blocks automerge
+            stack_severity="$(jq -r '.changeSeverity // "unknown"' "$summary_file")"
 
             if "$(jq -e '.jobStatus == "success"' "$summary_file")"; then
               emoji="🟩"
@@ -637,7 +697,8 @@ jobs:
               --arg stack "$stack" \
               --argjson success "$stack_success" \
               --argjson has_changes "$stack_has_changes" \
-              '. + {($stack): {success: $success, hasChanges: $has_changes}}')"
+              --arg change_severity "$stack_severity" \
+              '. + {($stack): {success: $success, hasChanges: $has_changes, changeSeverity: $change_severity}}')"
 
             if [ "$plan_url" != "" ]; then
               summary="$(printf "%s\n|%s|%s|%s|\n" "$summary" "$emoji" "[\`$stack\`]($plan_url)" "$plan_summary")"
@@ -687,6 +748,15 @@ jobs:
           # limited to stacks whose plan succeeded, e.g. {"stacks/dev/app": true}.
           stack_changes="$(echo "$stack_results" | jq -c 'with_entries(select(.value.success) | .value |= .hasChanges)')"
           echo "stack-changes=$stack_changes" >> "$GITHUB_OUTPUT"
+
+          # Expand-contract: the automerge evaluation switches to this map once
+          # evaluate-automerge consumes change severities; stack-changes then retires.
+          # Limited to stacks whose plan succeeded, e.g. {"stacks/dev/app": "additive"}.
+          stack_severities="$(echo "$stack_results" | jq -c 'with_entries(select(.value.success) | .value |= .changeSeverity)')"
+          echo "stack-severities=$stack_severities" >> "$GITHUB_OUTPUT"
+
+          # TODO(demo): revert before merge - severity visibility for manual test PRs
+          printf 'Stack results:\n\n```json\n%s\n```\n' "$(echo "$stack_results" | jq .)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Write to job summary
         if: ${{ github.event_name != 'pull_request' }}
@@ -746,10 +816,11 @@ jobs:
             && needs.summarize.outputs.success == 'true'
             && github.event.pull_request.commits == 1
           }}
-        uses: oslokommune/composite-actions/evaluate-automerge@55ee2c7bef4b80f4535761f03b8f3d07e064836f # evaluate-automerge-v1.0.2
+        # TODO(demo): revert before merge - unreleased action branch, fed severities
+        uses: oslokommune/composite-actions/evaluate-automerge@feat/evaluate-automerge-change-categories
         with:
           rules: ${{ inputs.pr-automerge-rules }}
-          stack-changes: ${{ needs.summarize.outputs.stack-changes }}
+          stack-severities: ${{ needs.summarize.outputs.stack-severities }}
 
       - name: Set automerge label
         if: ${{ always() }}
@@ -759,11 +830,14 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           AUTOMERGE: ${{ steps.evaluate.outputs.automerge }}
         run: |
-          # Label needs to exist in repository before trying to attach it to a PR
-          gh label create --force --color "0E8A16" --description "Renovate will merge PRs with this label automatically" "automerge"
+          # TODO(demo): revert before merge - "would-automerge" signals the decision
+          # without triggering the Renovate automerge scheduler; the real label is
+          # scrubbed so nothing on this PR is actionable.
+          echo "Automerge decision: ${AUTOMERGE:-not evaluated}" >> "$GITHUB_STEP_SUMMARY"
+          gh label create --force --color "FBCA04" --description "Demo: this PR would have been automerged" "would-automerge"
+          gh pr edit "$PR_NUMBER" --remove-label "automerge" || true
           if [ "$AUTOMERGE" = "true" ]; then
-            gh pr edit "$PR_NUMBER" --add-label "automerge"
+            gh pr edit "$PR_NUMBER" --add-label "would-automerge"
           else
-            # If we can't automerge, remove any existing (and outdated) label
-            gh pr edit "$PR_NUMBER" --remove-label "automerge"
+            gh pr edit "$PR_NUMBER" --remove-label "would-automerge"
           fi
