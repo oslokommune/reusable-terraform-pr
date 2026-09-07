@@ -397,38 +397,39 @@ jobs:
 
           # Extract structured plan summary if successful, set change severity
           # Default/Fallback is "unknown" for any parsing failure, or unknown actions in plan (such as forget, or create forget)
-          # Follows the priority unknown->any-changes->no-destroy->additive, defaults to the highest priority
+          # Follows the priority unknown->any-changes->no-destroy->additive->no-changes, defaults to the highest priority
+          # Takes into account resource changes and output changes
           change_severity="unknown"
           plan_json="$RUNNER_TEMP/plan.json"
           if [ "$PLAN_OUTCOME" = "success" ] && terraform show -json "$PLAN_FILE" > "$plan_json"; then
             # Get unique actions. A replace contributes both "delete" and "create".
             actions="$(jq '[.resource_changes[]?.change.actions] | flatten | unique' "$plan_json")"
 
-            # A resource verb we do not know how to rank
+            # Resource: Unknown verb
             if jq -e 'any(.[]?; IN("no-op", "read", "create", "update", "delete") | not)' <<<"$actions" >/dev/null; then
               change_severity="unknown"
 
-            # An output verb we don't know how to rank
+            # Output: Unknown output verb
             elif jq -e '.output_changes // {} | any(.[].actions[]?; IN("no-op", "create", "update", "delete") | not)' "$plan_json" >/dev/null; then
               change_severity="unknown"
 
-            # A resource destroyed
+            # Resource: delete -> any changes
             elif jq -e 'index("delete")' <<<"$actions" >/dev/null; then
               change_severity="any-changes"
 
-            # In place resource update
+            # Resource: update | delete -> no-destroy
             elif jq -e 'index("update")' <<<"$actions" >/dev/null; then
               change_severity="no-destroy"
 
-            # An output is updated or deleted
+            # Output: update | delete -> no-destroy
             elif jq -e '.output_changes // {} | any(.[].actions[]?; IN("update", "delete"))' "$plan_json" >/dev/null; then
               change_severity="no-destroy"
 
-            # A resource is created
+            # Resource: create -> additive
             elif jq -e 'index("create")' <<<"$actions" >/dev/null; then
               change_severity="additive"
 
-            # An output is created
+            # Output: create -> additive
             elif jq -e '.output_changes // {} | any(.[]; .actions | index("create"))' "$plan_json" >/dev/null; then
               change_severity="additive"
 
