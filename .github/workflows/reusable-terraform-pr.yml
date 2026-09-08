@@ -39,7 +39,7 @@ on:
         description: "Whether any stack had changes"
         value: ${{ jobs.summarize.outputs.has-changes == 'true' }}
       stack-results:
-        description: 'JSON object mapping each planned stack to its result: {success: bool, hasChanges: bool | null, changes: string}. hasChanges is null when the plan failed, since drift is then unknown. changes is the most severe kind of change the plan contains: "no-changes" < "additive" < "no-destroy" < "any-changes"; "unknown" (unclassifiable, e.g. a failed plan) blocks automerge. E.g. {"stacks/dev/app": {"success": true, "hasChanges": true, "changes": "additive"}, "stacks/dev/broken": {"success": false, "hasChanges": null, "changes": "unknown"}}'
+        description: 'JSON object mapping each planned stack to its result: {success: bool, hasChanges: bool | null, changes: string}. hasChanges is null when the plan failed, since drift is then unknown. changes is the most severe kind of change the plan contains: "no-changes" < "additive" < "no-destroy" < "any-changes"; a plan that cannot be classified (e.g. failed) is reported as "any-changes". E.g. {"stacks/dev/app": {"success": true, "hasChanges": true, "changes": "additive"}, "stacks/dev/broken": {"success": false, "hasChanges": null, "changes": "any-changes"}}'
         value: ${{ jobs.summarize.outputs.stack-results }}
 
 # NOTE: Prevent concurrent runs for the same PR from causing a race condition on PR comments.
@@ -356,6 +356,26 @@ jobs:
         run: |
           terraform show "$PLAN_FILE"
 
+      # The plan as JSON, for classification
+      - name: Show Terraform plan as JSON
+        id: plan-json
+        if: steps.plan.outcome == 'success'
+        # Classification falls back to "any-changes" if this fails
+        continue-on-error: true
+        working-directory: ${{ matrix.stack }}
+        env:
+          PLAN_FILE: ${{ steps.plan.outputs.plan-file }}
+        run: |
+          terraform show -json "$PLAN_FILE" > "$RUNNER_TEMP/plan.json"
+          echo "path=$RUNNER_TEMP/plan.json" >> "$GITHUB_OUTPUT"
+
+      - name: Classify plan changes
+        id: classify
+        if: steps.plan-json.outcome == 'success'
+        uses: $/.github/actions/parse-plan
+        with:
+          plan-json-path: ${{ steps.plan-json.outputs.path }}
+
       - name: Create Terraform plan summary file
         id: plan-summary
         env:
@@ -393,55 +413,6 @@ jobs:
             fi
           else
             tf_summary="$TF_FAILURE_OUTPUT"
-          fi
-
-          # Classify the plan's resource and output changes into a changes value.
-          # Checked in severity order, first match wins:
-          # unknown -> any-changes -> no-destroy -> additive -> no-changes
-          changes="unknown"
-          plan_json="$RUNNER_TEMP/plan.json"
-          if [ "$PLAN_OUTCOME" = "success" ] && terraform show -json "$PLAN_FILE" > "$plan_json"; then
-            # Get unique actions. A replace contributes both "delete" and "create".
-            actions="$(jq '[.resource_changes[]?.change.actions] | flatten | unique' "$plan_json")"
-
-            # Resource: unknown verb (e.g. forget) -> unknown
-            if jq -e 'any(.[]?; IN("no-op", "read", "create", "update", "delete") | not)' <<<"$actions" >/dev/null; then
-              changes="unknown"
-
-            # Output: unknown verb -> unknown
-            elif jq -e '.output_changes // {} | any(.[].actions[]?; IN("no-op", "create", "update", "delete") | not)' "$plan_json" >/dev/null; then
-              changes="unknown"
-
-            # Resource: delete -> any-changes
-            elif jq -e 'index("delete")' <<<"$actions" >/dev/null; then
-              changes="any-changes"
-
-            # Resource: update -> no-destroy
-            elif jq -e 'index("update")' <<<"$actions" >/dev/null; then
-              changes="no-destroy"
-
-            # Output: update | delete -> no-destroy
-            elif jq -e '.output_changes // {} | any(.[].actions[]?; IN("update", "delete"))' "$plan_json" >/dev/null; then
-              changes="no-destroy"
-
-            # Resource: create -> additive
-            elif jq -e 'index("create")' <<<"$actions" >/dev/null; then
-              changes="additive"
-
-            # Output: create -> additive
-            elif jq -e '.output_changes // {} | any(.[]; .actions | index("create"))' "$plan_json" >/dev/null; then
-              changes="additive"
-
-            # Only no-op/read verbs and untouched outputs remain -> no-changes
-            elif jq -e '(. - ["no-op", "read"]) == []' <<<"$actions" >/dev/null \
-              && jq -e '.output_changes // {} | all(.[].actions[]?; . == "no-op")' "$plan_json" >/dev/null; then
-              changes="no-changes"
-
-            # Fail safe: anything unmatched blocks automerge
-            else
-              echo "::warning title=Classify plan::unclassified changes in $STACK - blocking automerge"
-              changes="unknown"
-            fi
           fi
 
           # Extract plan summary if successful
@@ -535,7 +506,6 @@ jobs:
           EOF
 
           echo "result=$plan_summary" >> "$GITHUB_OUTPUT"
-          echo "changes=$changes" >> "$GITHUB_OUTPUT"
 
       - name: Find Terraform plan comment
         if: ${{ github.event_name == 'pull_request' }}
@@ -567,8 +537,8 @@ jobs:
           STACK: ${{ matrix.stack }}
           JOB_STATUS: ${{ job.status }}
           HAS_CHANGES: ${{ steps.plan-summary.outputs.result != 'No changes' }}
-          # Fail safe: an empty changes value (plan-summary step did not run) blocks automerge
-          CHANGES: ${{ steps.plan-summary.outputs.changes || 'unknown' }}
+          # Fail safe: an empty changes value (classify step skipped or failed) is treated as any-changes
+          CHANGES: ${{ steps.classify.outputs.changes || 'any-changes' }}
           SUMMARY: ${{ steps.plan-summary.outputs.result }}
           # Prefer comment URL for PRs, fall back to job URL
           PLAN_URL: >-
@@ -660,9 +630,9 @@ jobs:
           success="true"
           has_changes="false"
           # Per-stack results keyed by stack path, e.g.
-          # {"stacks/dev/app": {"success": true, "hasChanges": true, "changes": "additive"}, "stacks/dev/broken": {"success": false, "hasChanges": null, "changes": "unknown"}}
+          # {"stacks/dev/app": {"success": true, "hasChanges": true, "changes": "additive"}, "stacks/dev/broken": {"success": false, "hasChanges": null, "changes": "any-changes"}}
           # A failed plan has success false and hasChanges null, since drift is unknown for it.
-          # changes is the most severe kind of change: no-changes < additive < no-destroy < any-changes; "unknown" blocks automerge.
+          # changes is the most severe kind of change: no-changes < additive < no-destroy < any-changes.
           stack_results="{}"
 
           for summary_file in summaries/*.json; do
@@ -672,8 +642,8 @@ jobs:
             plan_summary="$(jq -r -e '.summary' "$summary_file")"
             stack_success="false"
             stack_has_changes="null"
-            # Fail safe: a summary file without a changes value blocks automerge
-            stack_changes="$(jq -r '.changes // "unknown"' "$summary_file")"
+            # Fail safe: a summary file without a changes value is treated as any-changes
+            stack_changes="$(jq -r '.changes // "any-changes"' "$summary_file")"
 
             if "$(jq -e '.jobStatus == "success"' "$summary_file")"; then
               emoji="🟩"
