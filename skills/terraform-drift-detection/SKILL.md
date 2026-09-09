@@ -58,4 +58,3 @@ Drift is a plan with changes when the code did not change. On a `schedule` the r
 ## Reference
 
 - [Scheduled drift detection](https://github.com/oslokommune/reusable-terraform-pr#scheduled-drift-detection) in the README describes the outputs the report job reads.
-- [pirates-iac](https://github.com/oslokommune/pirates-iac/blob/main/.github/workflows/terraform-pr.yml) is a complete caller workflow with the schedule and the report job.
