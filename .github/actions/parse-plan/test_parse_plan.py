@@ -101,7 +101,7 @@ class TestOutputChanges(unittest.TestCase):
         )
 
     def test_delete_with_output_delete_is_any_changes(self):
-        """A resource delete outranks any output change."""
+        """Resource and output deletes both rank with destruction."""
         self.assertEqual(
             "any-changes", pp.classify(_plan([["delete"]], {"url": ["delete"]}))
         )

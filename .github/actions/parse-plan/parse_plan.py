@@ -48,8 +48,7 @@ def classify(
         for verb in change["actions"]
     }
 
-    # NOTE: Order of checks matters, we check the most severe first, an unknown verb. Then progress through
-    # delete->update->create->no-op/read
+    # NOTE: Order of checks matters, most severe first
     if has_unrankable_verbs("resource", actions, resource_verbs):
         return "any-changes"
 
