@@ -25,7 +25,7 @@ on:
       pr-automerge-rules:
         type: string
         default: "[]"
-        description: "Only used when pr-automerge is enabled. JSON array of rules with pattern matching and per-update-type policies. Each rule: {pattern, major?, minor?, patch?}. Policies: 'never', 'no-changes', 'any-changes'. First matching pattern wins. Unspecified types default to 'no-changes'."
+        description: "Only used when pr-automerge is enabled. JSON array of rules with pattern matching and per-update-type policies. Each rule: {pattern, major?, minor?, patch?}. Policies name the most severe 'changes' value they tolerate: 'never' < 'no-changes' < 'additive' < 'non-destructive' < 'any-changes'. First matching pattern wins. Unspecified types default to 'no-changes'."
         required: false
     secrets:
       ssh-private-key:
@@ -708,9 +708,6 @@ jobs:
           echo "has-changes=$has_changes" >> "$GITHUB_OUTPUT"
           echo "stack-results=$stack_results" >> "$GITHUB_OUTPUT"
 
-          # TODO(demo): revert before merge - changes visibility for manual test PRs
-          printf 'Stack results:\n\n```json\n%s\n```\n' "$(echo "$stack_results" | jq .)" >> "$GITHUB_STEP_SUMMARY"
-
       - name: Write to job summary
         if: ${{ github.event_name != 'pull_request' }}
         env:
@@ -783,14 +780,11 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           AUTOMERGE: ${{ steps.evaluate.outputs.automerge }}
         run: |
-          # TODO(demo): revert before merge - "would-automerge" signals the decision
-          # without triggering the Renovate automerge scheduler; the real label is
-          # scrubbed so nothing on this PR is actionable.
-          echo "Automerge decision: ${AUTOMERGE:-not evaluated}" >> "$GITHUB_STEP_SUMMARY"
-          gh label create --force --color "FBCA04" --description "Demo: this PR would have been automerged" "would-automerge"
-          gh pr edit "$PR_NUMBER" --remove-label "automerge" || true
+          # Label needs to exist in repository before trying to attach it to a PR
+          gh label create --force --color "0E8A16" --description "Renovate will merge PRs with this label automatically" "automerge"
           if [ "$AUTOMERGE" = "true" ]; then
-            gh pr edit "$PR_NUMBER" --add-label "would-automerge"
+            gh pr edit "$PR_NUMBER" --add-label "automerge"
           else
-            gh pr edit "$PR_NUMBER" --remove-label "would-automerge"
+            # If we can't automerge, remove any existing (and outdated) label
+            gh pr edit "$PR_NUMBER" --remove-label "automerge"
           fi

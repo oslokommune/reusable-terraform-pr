@@ -47,22 +47,23 @@ jobs:
 |-----------------|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `success`       | boolean              | Whether all Terraform plans succeeded                                                                                                                                    |
 | `has-changes`   | boolean              | Whether any stack had changes                                                                                                                                            |
-| `stack-results` | string (JSON object) | Maps each planned stack to `success` and `hasChanges`. `hasChanges` is `null` when the plan failed. See [stack results](#stack-results).                                 |
+| `stack-results` | string (JSON object) | Maps each planned stack to `success`, `hasChanges` and `changes`. `hasChanges` is `null` when the plan failed. See [stack results](#stack-results).                      |
 
 #### Stack results
 
-`stack-results` is keyed by stack path. Each value has the same two fields:
+`stack-results` is keyed by stack path. Each value has the same three fields:
 
 ```json
 {
-  "stacks/dev/app": { "success": true, "hasChanges": true },
-  "stacks/prod/app": { "success": true, "hasChanges": false },
-  "stacks/dev/slackbot": { "success": false, "hasChanges": null }
+  "stacks/dev/app": { "success": true, "hasChanges": true, "changes": "additive" },
+  "stacks/prod/app": { "success": true, "hasChanges": false, "changes": "no-changes" },
+  "stacks/dev/slackbot": { "success": false, "hasChanges": null, "changes": "any-changes" }
 }
 ```
 
 - `success`: whether `terraform plan` succeeded for the stack.
 - `hasChanges`: whether the plan had changes. `null` when the plan failed, since drift is then unknown.
+- `changes`: the most severe kind of change the plan contains: `no-changes` < `additive` < `non-destructive` < `any-changes`. A plan that cannot be classified (e.g. failed) is reported as `any-changes`.
 
 The keys are the planned stacks, so `keys` gives the full list.
 
@@ -125,9 +126,11 @@ When `pr-automerge` is enabled, Renovate PRs are evaluated for automerge eligibi
 
 `pr-automerge-rules` is a JSON array of rules. Each rule has a `pattern` (glob) and optional policies for `major`, `minor`, and `patch` update types. First matching pattern wins.
 
-Policies:
+Policies name the most severe kind of change they tolerate:
 - `never` - never automerge this update type
 - `no-changes` - only automerge if the Terraform plan has no changes (default)
+- `additive` - also allow plans that only add: new resources and new outputs
+- `non-destructive` - also allow changes in place; nothing is destroyed, replaced or removed
 - `any-changes` - automerge regardless of plan changes
 
 ```yaml
@@ -145,7 +148,7 @@ jobs:
       pr-automerge: true
       pr-automerge-rules: |
         [
-          {"pattern": "**/prod/**", "major": "never",      "minor": "no-changes",  "patch": "any-changes"},
+          {"pattern": "**/prod/**", "major": "never",      "minor": "additive",    "patch": "non-destructive"},
           {"pattern": "**",         "major": "no-changes", "minor": "any-changes", "patch": "any-changes"}
         ]
     secrets:
