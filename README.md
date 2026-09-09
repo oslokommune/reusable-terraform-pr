@@ -114,7 +114,7 @@ The reusable workflow only plans. A `report` job in the caller, run on `schedule
 - a stack has changes, which is drift
 - a plan failed, which means drift is unknown for that stack
 
-The report job does not depend on the plan job succeeding, so one broken stack does not hide drift in the others. Stacks that always have changes, such as a service scaled outside Terraform, are listed in the report job as expected changes and skipped. They are still planned and shown in the summary. Use `ignored-stacks` for stacks that should not be planned at all.
+The report job does not depend on the plan job succeeding, so one broken stack does not hide drift in the others. The step is a Node script with a JSON list of ignore rules. A `drift` rule covers a stack that always has changes, such as a service scaled outside Terraform. A `failure` rule covers a stack whose plan is known to fail. Each rule has a glob pattern and a reason, and the job prints a notice for rules that ignored nothing. Ignored stacks are still planned and shown in the summary. Use `ignored-stacks` for stacks that should not be planned at all.
 
 > [!TIP]
 > [pirates-iac](https://github.com/oslokommune/pirates-iac/blob/main/.github/workflows/terraform-pr.yml) has a complete workflow with the `schedule` trigger and the report job. Copy it and adjust the list of expected changes, or let an agent do it with the [`terraform-drift-detection` skill](#agent-plugin).
