@@ -23,11 +23,11 @@ class TestResourceChanges(unittest.TestCase):
     def test_create_is_additive(self):
         self.assertEqual("additive", pp.classify(_plan([["create"], ["create"]])))
 
-    def test_update_is_no_destroy(self):
-        self.assertEqual("no-destroy", pp.classify(_plan([["update"]])))
+    def test_update_is_non_destructive(self):
+        self.assertEqual("non-destructive", pp.classify(_plan([["update"]])))
 
-    def test_create_and_update_is_no_destroy(self):
-        self.assertEqual("no-destroy", pp.classify(_plan([["create"], ["update"]])))
+    def test_create_and_update_is_non_destructive(self):
+        self.assertEqual("non-destructive", pp.classify(_plan([["create"], ["update"]])))
 
     def test_delete_is_any_changes(self):
         self.assertEqual("any-changes", pp.classify(_plan([["delete"]])))
@@ -61,16 +61,16 @@ class TestOutputChanges(unittest.TestCase):
     def test_output_create_is_additive(self):
         self.assertEqual("additive", pp.classify(_plan(outputs={"url": ["create"]})))
 
-    def test_output_update_is_no_destroy(self):
-        self.assertEqual("no-destroy", pp.classify(_plan(outputs={"url": ["update"]})))
+    def test_output_update_is_non_destructive(self):
+        self.assertEqual("non-destructive", pp.classify(_plan(outputs={"url": ["update"]})))
 
     def test_output_delete_is_any_changes(self):
         """Deleting an output breaks remote-state consumers, so it ranks with destruction."""
         self.assertEqual("any-changes", pp.classify(_plan(outputs={"url": ["delete"]})))
 
-    def test_output_create_and_update_is_no_destroy(self):
+    def test_output_create_and_update_is_non_destructive(self):
         self.assertEqual(
-            "no-destroy",
+            "non-destructive",
             pp.classify(_plan(outputs={"url": ["update"], "name": ["create"]})),
         )
 
@@ -82,10 +82,10 @@ class TestOutputChanges(unittest.TestCase):
             "additive", pp.classify(_plan([["create"]], {"url": ["create"]}))
         )
 
-    def test_create_with_output_update_is_no_destroy(self):
+    def test_create_with_output_update_is_non_destructive(self):
         """An existing output changing outranks a purely additive plan."""
         self.assertEqual(
-            "no-destroy", pp.classify(_plan([["create"]], {"url": ["update"]}))
+            "non-destructive", pp.classify(_plan([["create"]], {"url": ["update"]}))
         )
 
     def test_create_with_output_delete_is_any_changes(self):

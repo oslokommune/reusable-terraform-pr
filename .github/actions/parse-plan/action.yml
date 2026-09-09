@@ -1,5 +1,5 @@
 name: "Parse Terraform plan"
-description: "Classify a Terraform plan into a changes value: no-changes < additive < no-destroy < any-changes. A plan that cannot be classified is treated as 'any-changes'."
+description: "Classify a Terraform plan into a changes value: no-changes < additive < non-destructive < any-changes. A plan that cannot be classified is treated as 'any-changes'."
 
 inputs:
   plan-json-path:
@@ -8,7 +8,7 @@ inputs:
 
 outputs:
   changes:
-    description: "The most severe kind of change in the plan: 'no-changes', 'additive', 'no-destroy' or 'any-changes'"
+    description: "The most severe kind of change in the plan: 'no-changes', 'additive', 'non-destructive' or 'any-changes'"
     value: ${{ steps.parse.outputs.changes }}
 
 runs:

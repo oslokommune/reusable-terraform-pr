@@ -16,6 +16,16 @@ import argparse
 import json
 import sys
 
+def has_unrankable_verbs(scope: str, verbs: set[str], known: frozenset[str]) -> bool:
+    unrankable = verbs - known
+    if unrankable:
+        print(
+            f"Treating unrankable {scope} verbs as any-changes: {sorted(unrankable)}",
+            file=sys.stderr,
+        )
+    return bool(unrankable)
+
+
 def classify(
     plan: dict,
     resource_verbs: frozenset[str] = frozenset(
@@ -24,7 +34,7 @@ def classify(
     output_verbs: frozenset[str] = frozenset({"no-op", "create", "update", "delete"}),
 ) -> str:
     """Checked in severity order, first match wins:
-    any-changes -> no-destroy -> additive -> no-changes
+    any-changes -> non-destructive -> additive -> no-changes
     """
     # Every action verb in the plan; a replace contributes both "delete" and "create"
     actions = {
@@ -38,41 +48,28 @@ def classify(
         for verb in change["actions"]
     }
 
-    # Resource: unrankable verb (e.g. forget) -> any-changes
-    if actions - resource_verbs:
-        print(
-            f"Treating unrankable resource verbs as any-changes: {sorted(actions - resource_verbs)}",
-            file=sys.stderr,
-        )
+    # NOTE: Order of checks matters, we check the most severe first, an unknown verb. Then progress through
+    # delete->update->create->no-op/read
+    if has_unrankable_verbs("resource", actions, resource_verbs):
         return "any-changes"
 
-    # Output: unrankable verb -> any-changes
-    if output_actions - output_verbs:
-        print(
-            f"Treating unrankable output verbs as any-changes: {sorted(output_actions - output_verbs)}",
-            file=sys.stderr,
-        )
+    if has_unrankable_verbs("output", output_actions, output_verbs):
         return "any-changes"
 
     if {"delete", "forget"} & actions or "delete" in output_actions:
         return "any-changes"
 
     if "update" in actions or "update" in output_actions:
-        return "no-destroy"
+        return "non-destructive"
 
     if "create" in actions or "create" in output_actions:
         return "additive"
 
-    # Only no-op/read verbs and untouched outputs remain -> no-changes
-    if actions <= {"no-op", "read"} and output_actions <= {"no-op"}:
-        return "no-changes"
-
-    # Fail safe: anything unmatched is treated as the most severe value
-    print("Treating unclassified changes as any-changes", file=sys.stderr)
-    return "any-changes"
+    # Only no-op/read verbs and untouched outputs remain
+    return "no-changes"
 
 def verify_version(plan: dict, supported_major: str = "1") -> bool:
-    # format_version is "MAJOR.MINOR"; minor will not change json structure, see
+    # format_version is "MAJOR.MINOR", see
     # https://developer.hashicorp.com/terraform/internals/json-format#format-summary
     return str(plan.get("format_version", "")).split(".")[0] == supported_major
 

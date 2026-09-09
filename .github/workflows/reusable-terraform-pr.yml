@@ -39,7 +39,7 @@ on:
         description: "Whether any stack had changes"
         value: ${{ jobs.summarize.outputs.has-changes == 'true' }}
       stack-results:
-        description: 'JSON object mapping each planned stack to its result: {success: bool, hasChanges: bool | null, changes: string}. hasChanges is null when the plan failed, since drift is then unknown. changes is the most severe kind of change the plan contains: "no-changes" < "additive" < "no-destroy" < "any-changes"; a plan that cannot be classified (e.g. failed) is reported as "any-changes". E.g. {"stacks/dev/app": {"success": true, "hasChanges": true, "changes": "additive"}, "stacks/dev/broken": {"success": false, "hasChanges": null, "changes": "any-changes"}}'
+        description: 'JSON object mapping each planned stack to its result: {success: bool, hasChanges: bool | null, changes: string}. hasChanges is null when the plan failed, since drift is then unknown. changes is the most severe kind of change the plan contains: "no-changes" < "additive" < "non-destructive" < "any-changes"; a plan that cannot be classified (e.g. failed) is reported as "any-changes". E.g. {"stacks/dev/app": {"success": true, "hasChanges": true, "changes": "additive"}, "stacks/dev/broken": {"success": false, "hasChanges": null, "changes": "any-changes"}}'
         value: ${{ jobs.summarize.outputs.stack-results }}
 
 # NOTE: Prevent concurrent runs for the same PR from causing a race condition on PR comments.
@@ -632,7 +632,7 @@ jobs:
           # Per-stack results keyed by stack path, e.g.
           # {"stacks/dev/app": {"success": true, "hasChanges": true, "changes": "additive"}, "stacks/dev/broken": {"success": false, "hasChanges": null, "changes": "any-changes"}}
           # A failed plan has success false and hasChanges null, since drift is unknown for it.
-          # changes is the most severe kind of change: no-changes < additive < no-destroy < any-changes.
+          # changes is the most severe kind of change: no-changes < additive < non-destructive < any-changes.
           stack_results="{}"
 
           for summary_file in summaries/*.json; do
