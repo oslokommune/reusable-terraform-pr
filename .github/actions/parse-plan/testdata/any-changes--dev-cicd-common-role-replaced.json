@@ -1,0 +1,334 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.16.1",
+  "resource_changes": [
+    {
+      "address": "aws_cloudwatch_log_group.static_website_deployment",
+      "mode": "managed",
+      "type": "aws_cloudwatch_log_group",
+      "name": "static_website_deployment",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_ecr_repository.artifact",
+      "mode": "managed",
+      "type": "aws_ecr_repository",
+      "name": "artifact",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_ecr_repository_policy.artifact",
+      "mode": "managed",
+      "type": "aws_ecr_repository_policy",
+      "name": "artifact",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role.app_deployment[0]",
+      "mode": "managed",
+      "type": "aws_iam_role",
+      "name": "app_deployment",
+      "change": {
+        "actions": [
+          "delete",
+          "create"
+        ],
+        "replace_paths": [
+          [
+            "name"
+          ]
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role.artifact_publish[0]",
+      "mode": "managed",
+      "type": "aws_iam_role",
+      "name": "artifact_publish",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role.iac_deploy[0]",
+      "mode": "managed",
+      "type": "aws_iam_role",
+      "name": "iac_deploy",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role.iac_plan[0]",
+      "mode": "managed",
+      "type": "aws_iam_role",
+      "name": "iac_plan",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role.static_website_deployment",
+      "mode": "managed",
+      "type": "aws_iam_role",
+      "name": "static_website_deployment",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role_policy.app_deploy[0]",
+      "mode": "managed",
+      "type": "aws_iam_role_policy",
+      "name": "app_deploy",
+      "change": {
+        "actions": [
+          "delete",
+          "create"
+        ],
+        "replace_paths": [
+          [
+            "role"
+          ]
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role_policy.app_deploy_denies[0]",
+      "mode": "managed",
+      "type": "aws_iam_role_policy",
+      "name": "app_deploy_denies",
+      "change": {
+        "actions": [
+          "delete",
+          "create"
+        ],
+        "replace_paths": [
+          [
+            "role"
+          ]
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role_policy.app_deploy_s3_denies[0]",
+      "mode": "managed",
+      "type": "aws_iam_role_policy",
+      "name": "app_deploy_s3_denies",
+      "change": {
+        "actions": [
+          "delete",
+          "create"
+        ],
+        "replace_paths": [
+          [
+            "role"
+          ]
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role_policy.artifact_publish[0]",
+      "mode": "managed",
+      "type": "aws_iam_role_policy",
+      "name": "artifact_publish",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role_policy.iac_plan_datadog_cross_account[0]",
+      "mode": "managed",
+      "type": "aws_iam_role_policy",
+      "name": "iac_plan_datadog_cross_account",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role_policy.iac_plan_denies[0]",
+      "mode": "managed",
+      "type": "aws_iam_role_policy",
+      "name": "iac_plan_denies",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role_policy.iac_plan_s3_denies[0]",
+      "mode": "managed",
+      "type": "aws_iam_role_policy",
+      "name": "iac_plan_s3_denies",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role_policy.static_website_deployment",
+      "mode": "managed",
+      "type": "aws_iam_role_policy",
+      "name": "static_website_deployment",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role_policy_attachment.app_deploy_readonly[0]",
+      "mode": "managed",
+      "type": "aws_iam_role_policy_attachment",
+      "name": "app_deploy_readonly",
+      "change": {
+        "actions": [
+          "delete",
+          "create"
+        ],
+        "replace_paths": [
+          [
+            "role"
+          ]
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role_policy_attachment.iac_deploy_admin[0]",
+      "mode": "managed",
+      "type": "aws_iam_role_policy_attachment",
+      "name": "iac_deploy_admin",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role_policy_attachment.iac_plan_read_only[0]",
+      "mode": "managed",
+      "type": "aws_iam_role_policy_attachment",
+      "name": "iac_plan_read_only",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_iam_role_policy_attachment.static_website_deployment",
+      "mode": "managed",
+      "type": "aws_iam_role_policy_attachment",
+      "name": "static_website_deployment",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_lambda_function.static_website_deployment",
+      "mode": "managed",
+      "type": "aws_lambda_function",
+      "name": "static_website_deployment",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_s3_bucket.artifact",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "artifact",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_s3_bucket_ownership_controls.artifact",
+      "mode": "managed",
+      "type": "aws_s3_bucket_ownership_controls",
+      "name": "artifact",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_s3_bucket_policy.artifact_bucket_policy",
+      "mode": "managed",
+      "type": "aws_s3_bucket_policy",
+      "name": "artifact_bucket_policy",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_s3_bucket_public_access_block.artifact",
+      "mode": "managed",
+      "type": "aws_s3_bucket_public_access_block",
+      "name": "artifact",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_s3_bucket_versioning.artifact",
+      "mode": "managed",
+      "type": "aws_s3_bucket_versioning",
+      "name": "artifact",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_ssm_parameter.static_website_deployment_function_name",
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "static_website_deployment_function_name",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    }
+  ],
+  "output_changes": {}
+}

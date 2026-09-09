@@ -1,3 +1,5 @@
+import json
+import pathlib
 import unittest
 
 import parse_plan as pp
@@ -123,6 +125,21 @@ class TestFailSafes(unittest.TestCase):
         self.assertEqual(
             "no-changes", pp.classify({"resource_changes": None, "output_changes": None})
         )
+
+
+class TestRealPlans(unittest.TestCase):
+    """Scrubbed plans from real runs; the filename prefix names the expected value."""
+
+    def test_testdata_plans(self):
+        plans = sorted((pathlib.Path(__file__).parent / "testdata").glob("*.json"))
+        self.assertTrue(plans)
+        for path in plans:
+            with self.subTest(plan=path.name):
+                expected = path.name.split("--")[0]
+                with open(path) as f:
+                    plan = json.load(f)
+                self.assertTrue(pp.verify_version(plan))
+                self.assertEqual(expected, pp.classify(plan))
 
 
 if __name__ == "__main__":
