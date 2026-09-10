@@ -57,13 +57,13 @@ jobs:
 {
   "stacks/dev/app": { "success": true, "hasChanges": true, "changes": "additive" },
   "stacks/prod/app": { "success": true, "hasChanges": false, "changes": "no-changes" },
-  "stacks/dev/slackbot": { "success": false, "hasChanges": null, "changes": "any-changes" }
+  "stacks/dev/slackbot": { "success": false, "hasChanges": null, "changes": null }
 }
 ```
 
 - `success`: whether `terraform plan` succeeded for the stack.
 - `hasChanges`: whether the plan had changes. `null` when the plan failed, since drift is then unknown.
-- `changes`: the most severe kind of change the plan contains: `no-changes` < `additive` < `non-destructive` < `any-changes`. A plan that cannot be classified (e.g. failed) is reported as `any-changes`.
+- `changes`: the most severe kind of change the plan contains: `no-changes` < `additive` < `non-destructive` < `any-changes`. Like `hasChanges` it is `null` when the stack was not classified (e.g. the plan failed); `null` never automerges.
 
 The keys are the planned stacks, so `keys` gives the full list.
 

@@ -39,7 +39,7 @@ on:
         description: "Whether any stack had changes"
         value: ${{ jobs.summarize.outputs.has-changes == 'true' }}
       stack-results:
-        description: 'JSON object mapping each planned stack to its result: {success: bool, hasChanges: bool | null, changes: string}. hasChanges is null when the plan failed, since drift is then unknown. changes is the most severe kind of change the plan contains: "no-changes" < "additive" < "non-destructive" < "any-changes"; a plan that cannot be classified (e.g. failed) is reported as "any-changes". E.g. {"stacks/dev/app": {"success": true, "hasChanges": true, "changes": "additive"}, "stacks/dev/broken": {"success": false, "hasChanges": null, "changes": "any-changes"}}'
+        description: 'JSON object mapping each planned stack to its result: {success: bool, hasChanges: bool | null, changes: string | null}. hasChanges is null when the plan failed, since drift is then unknown. changes is the most severe kind of change the plan contains: "no-changes" < "additive" < "non-destructive" < "any-changes". Like hasChanges it is null when the stack was not classified (e.g. the plan failed); null never automerges. E.g. {"stacks/dev/app": {"success": true, "hasChanges": true, "changes": "additive"}, "stacks/dev/broken": {"success": false, "hasChanges": null, "changes": null}}'
         value: ${{ jobs.summarize.outputs.stack-results }}
 
 # NOTE: Prevent concurrent runs for the same PR from causing a race condition on PR comments.
@@ -360,7 +360,6 @@ jobs:
       - name: Show Terraform plan as JSON
         id: plan-json
         if: steps.plan.outcome == 'success'
-        # Classification falls back to "any-changes" if this fails
         continue-on-error: true
         working-directory: ${{ matrix.stack }}
         env:
@@ -372,7 +371,6 @@ jobs:
       - name: Classify plan changes
         id: classify
         if: steps.plan-json.outcome == 'success'
-        # Classification falls back to "any-changes" if this fails
         continue-on-error: true
         uses: $/.github/actions/parse-plan
         with:
@@ -538,8 +536,8 @@ jobs:
           STACK: ${{ matrix.stack }}
           JOB_STATUS: ${{ job.status }}
           HAS_CHANGES: ${{ steps.plan-summary.outputs.result != 'No changes' }}
-          # Fail safe: an empty changes value (classify step skipped or failed) is treated as any-changes
-          CHANGES: ${{ steps.classify.outputs.changes || 'any-changes' }}
+          # Empty when the classify step was skipped or failed; stored as null
+          CHANGES: ${{ steps.classify.outputs.changes }}
           SUMMARY: ${{ steps.plan-summary.outputs.result }}
           # Prefer comment URL for PRs, fall back to job URL
           PLAN_URL: >-
@@ -557,7 +555,7 @@ jobs:
             --arg job_status "$JOB_STATUS" \
             --arg summary "$SUMMARY" \
             --arg planUrl "$PLAN_URL" \
-            '{stack: $stack, hasChanges: $has_changes, changes: $changes, jobStatus: $job_status, summary: $summary, planUrl: $planUrl}'
+            '{stack: $stack, hasChanges: $has_changes, changes: (if $changes == "" then null else $changes end), jobStatus: $job_status, summary: $summary, planUrl: $planUrl}'
           )"
 
           artifact_name="summary-$(echo "$STACK" | sed 's/[^a-zA-Z0-9-]/-/g' | sed 's/--/-/g')"
@@ -631,7 +629,7 @@ jobs:
           success="true"
           has_changes="false"
           # Per-stack results keyed by stack path, e.g.
-          # {"stacks/dev/app": {"success": true, "hasChanges": true, "changes": "additive"}, "stacks/dev/broken": {"success": false, "hasChanges": null, "changes": "any-changes"}}
+          # {"stacks/dev/app": {"success": true, "hasChanges": true, "changes": "additive"}, "stacks/dev/broken": {"success": false, "hasChanges": null, "changes": null}}
           # A failed plan has success false and hasChanges null, since drift is unknown for it.
           # changes is the most severe kind of change: no-changes < additive < non-destructive < any-changes.
           stack_results="{}"
@@ -643,8 +641,8 @@ jobs:
             plan_summary="$(jq -r -e '.summary' "$summary_file")"
             stack_success="false"
             stack_has_changes="null"
-            # Fail safe: a summary file without a changes value is treated as any-changes
-            stack_changes="$(jq -r '.changes // "any-changes"' "$summary_file")"
+            # null when the stack was not classified
+            stack_changes="$(jq -c '.changes' "$summary_file")"
 
             if "$(jq -e '.jobStatus == "success"' "$summary_file")"; then
               emoji="🟩"
@@ -663,7 +661,7 @@ jobs:
               --arg stack "$stack" \
               --argjson success "$stack_success" \
               --argjson has_changes "$stack_has_changes" \
-              --arg changes "$stack_changes" \
+              --argjson changes "$stack_changes" \
               '. + {($stack): {success: $success, hasChanges: $has_changes, changes: $changes}}')"
 
             if [ "$plan_url" != "" ]; then
