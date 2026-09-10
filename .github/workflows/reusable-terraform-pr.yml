@@ -372,6 +372,8 @@ jobs:
       - name: Classify plan changes
         id: classify
         if: steps.plan-json.outcome == 'success'
+        # Classification falls back to "any-changes" if this fails
+        continue-on-error: true
         uses: $/.github/actions/parse-plan
         with:
           plan-json-path: ${{ steps.plan-json.outputs.path }}
