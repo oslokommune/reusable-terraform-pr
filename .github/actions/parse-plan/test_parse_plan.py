@@ -55,6 +55,15 @@ class TestResourceChanges(unittest.TestCase):
     def test_unrankable_verb_is_any_changes(self):
         self.assertEqual("any-changes", pp.classify(_plan([["mystery"]])))
 
+    def test_import_only_is_no_changes(self):
+        """importing is a field, not a verb: an import-only plan adds only state."""
+        plan = {"resource_changes": [{"change": {"actions": ["no-op"], "importing": {"id": "abc"}}}]}
+        self.assertEqual("no-changes", pp.classify(plan))
+
+    def test_import_with_update_is_non_destructive(self):
+        plan = {"resource_changes": [{"change": {"actions": ["update"], "importing": {"id": "abc"}}}]}
+        self.assertEqual("non-destructive", pp.classify(plan))
+
 
 class TestOutputChanges(unittest.TestCase):
     def test_output_noop_is_no_changes(self):
@@ -128,15 +137,25 @@ class TestFailSafes(unittest.TestCase):
 
 
 class TestRealPlans(unittest.TestCase):
-    """Scrubbed plans from real runs; the filename prefix names the expected value."""
+    """Scrubbed plans from real runs and their expected changes values."""
 
-    def test_testdata_plans(self):
-        plans = sorted((pathlib.Path(__file__).parent / "testdata").glob("*.json"))
-        self.assertTrue(plans)
-        for path in plans:
-            with self.subTest(plan=path.name):
-                expected = path.name.split("--")[0]
-                with open(path) as f:
+    PLANS = {
+        "dev-remote-state.json": "no-changes",
+        "dev-site-cdn-resource-moved.json": "no-changes",
+        "dev-site-cdn-data-new-output.json": "additive",
+        "dev-site-cdn-output-updated.json": "non-destructive",
+        "dev-cicd-common-import-with-update.json": "non-destructive",
+        "dev-cicd-common-role-replaced.json": "any-changes",
+        "dev-site-cdn-resource-removed.json": "any-changes",
+    }
+
+    def test_real_plans(self):
+        testdata = pathlib.Path(__file__).parent / "testdata"
+        # every fixture on disk is asserted, and every assertion has a fixture
+        self.assertEqual(set(self.PLANS), {path.name for path in testdata.glob("*.json")})
+        for name, expected in self.PLANS.items():
+            with self.subTest(plan=name):
+                with open(testdata / name) as f:
                     plan = json.load(f)
                 self.assertTrue(pp.verify_version(plan))
                 self.assertEqual(expected, pp.classify(plan))
