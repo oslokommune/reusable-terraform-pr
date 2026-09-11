@@ -16,25 +16,10 @@ import argparse
 import json
 import sys
 
-def has_unrankable_verbs(scope: str, verbs: set[str], known: frozenset[str]) -> bool:
-    unrankable = verbs - known
-    if unrankable:
-        print(
-            f"Treating unrankable {scope} verbs as any-changes: {sorted(unrankable)}",
-            file=sys.stderr,
-        )
-    return bool(unrankable)
 
-
-def classify(
-    plan: dict,
-    resource_verbs: frozenset[str] = frozenset(
-        {"no-op", "read", "create", "update", "delete", "forget"}
-    ),
-    output_verbs: frozenset[str] = frozenset({"no-op", "create", "update", "delete"}),
-) -> str:
-    """Checked in severity order, first match wins:
-    any-changes -> non-destructive -> additive -> no-changes
+def classify(plan: dict) -> str:
+    """Checks least severe first; the first tier that covers every verb in
+    the plan wins. Anything not covered is the catch-all "any-changes".
     """
     # Every action verb in the plan; a replace contributes both "delete" and "create"
     actions = {
@@ -48,24 +33,18 @@ def classify(
         for verb in change["actions"]
     }
 
-    # NOTE: Order of checks matters, most severe first
-    if has_unrankable_verbs("resource", actions, resource_verbs):
-        return "any-changes"
+    # NOTE: Order matters: tiers are nested, least severe tier is checked first
+    if actions <= {"no-op", "read"} and output_actions <= {"no-op"}:
+        return "no-changes"
 
-    if has_unrankable_verbs("output", output_actions, output_verbs):
-        return "any-changes"
-
-    if {"delete", "forget"} & actions or "delete" in output_actions:
-        return "any-changes"
-
-    if "update" in actions or "update" in output_actions:
-        return "non-destructive"
-
-    if "create" in actions or "create" in output_actions:
+    if actions <= {"no-op", "read", "create"} and output_actions <= {"no-op", "create"}:
         return "additive"
 
-    # Only no-op/read verbs and untouched outputs remain
-    return "no-changes"
+    if actions <= {"no-op", "read", "create", "update"} and output_actions <= {"no-op", "create", "update"}:
+        return "non-destructive"
+
+    # Single Catch all: deletes, forgets, and any verb we do not know
+    return "any-changes"
 
 def verify_version(plan: dict, supported_major: str = "1") -> bool:
     # format_version is "MAJOR.MINOR", see
