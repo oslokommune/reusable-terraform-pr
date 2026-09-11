@@ -18,39 +18,40 @@ import sys
 
 # The verbs each classification tolerates, for resource and output changes
 NO_CHANGES = {
-    "actions": {"no-op", "read"},
-    "output_actions": {"no-op"},
+    "actions": ("no-op", "read"),
+    "output_actions": ("no-op",),
 }
 ADDITIVE = {
-    "actions": {"no-op", "read", "create"},
-    "output_actions": {"no-op", "create"},
+    "actions": ("no-op", "read", "create"),
+    "output_actions": ("no-op", "create"),
 }
 NON_DESTRUCTIVE = {
-    "actions": {"no-op", "read", "create", "update"},
-    "output_actions": {"no-op", "create", "update"},
+    "actions": ("no-op", "read", "create", "update"),
+    "output_actions": ("no-op", "create", "update"),
 }
 
 
-def only_allowed_actions(actions: set, output_actions: set, allowed: dict) -> bool:
-    # <= on sets is "subset of": every verb seen is tolerated
-    return actions <= allowed["actions"] and output_actions <= allowed["output_actions"]
+def only_allowed_actions(actions: dict, output_actions: dict, allowed: dict) -> bool:
+    resources_allowed = all(verb in allowed["actions"] for verb in actions)
+    outputs_allowed = all(verb in allowed["output_actions"] for verb in output_actions)
+    return resources_allowed and outputs_allowed
 
 def classify(plan: dict) -> str:
     """Checks least severe first: a plan classifies as the first category
     that tolerates every verb in it. Anything else is the catch-all
     "any-changes".
     """
-    # Every action verb in the plan; a replace contributes both "delete" and "create"
-    actions = {
-        verb
-        for change in plan.get("resource_changes") or []
-        for verb in change["change"]["actions"]
-    }
-    output_actions = {
-        verb
-        for change in (plan.get("output_changes") or {}).values()
-        for verb in change["actions"]
-    }
+    # Every action verb in the plan and how many changes carry it;
+    # a replace contributes both "delete" and "create"
+    actions: dict[str, int] = {}
+    for change in plan.get("resource_changes") or []:
+        for verb in change["change"]["actions"]:
+            actions[verb] = actions.get(verb, 0) + 1
+
+    output_actions: dict[str, int] = {}
+    for change in (plan.get("output_changes") or {}).values():
+        for verb in change["actions"]:
+            output_actions[verb] = output_actions.get(verb, 0) + 1
 
     # NOTE: Order matters: least severe first
     if only_allowed_actions(actions, output_actions, NO_CHANGES):
@@ -89,8 +90,8 @@ if __name__ == "__main__":
     except (OSError, json.JSONDecodeError) as e:
         sys.exit(f"Could not read plan: {e}")
 
-    if not verify_version(plan):
     # An unsupported plan format means this parser is outdated: fail instead of guessing
+    if not verify_version(plan):
         sys.exit(f"Unsupported format_version {plan.get('format_version')!r}, update parse-plan")
 
     print(classify(plan))
