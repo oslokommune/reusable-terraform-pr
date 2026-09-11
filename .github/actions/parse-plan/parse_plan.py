@@ -1,4 +1,4 @@
-"""Classify a Terraform plan into a changes value.
+"""Classify a Terraform plan into a change severity.
 
 Reads the JSON representation of a plan (`terraform show -json <planfile>`)
 and prints the most severe kind of change it contains. Covers resource and
@@ -9,7 +9,7 @@ those mean the pipeline is broken, not that the plan is dangerous.
 Usage:
   python3 parse_plan.py --plan-json-path <path>
 
-Output: prints the changes value to stdout.
+Output: prints the change severity to stdout.
 """
 
 import argparse
@@ -54,7 +54,7 @@ def verify_version(plan: dict, supported_major: str = "1") -> bool:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Classify a Terraform plan JSON into a changes value"
+        description="Classify a Terraform plan JSON into a change severity"
     )
     parser.add_argument(
         "--plan-json-path",
