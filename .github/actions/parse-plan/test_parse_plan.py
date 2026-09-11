@@ -115,6 +115,11 @@ class TestOutputChanges(unittest.TestCase):
             "any-changes", pp.classify(_plan([["delete"]], {"url": ["delete"]}))
         )
 
+    def test_update_with_output_noop_is_non_destructive(self):
+        self.assertEqual(
+            "non-destructive", pp.classify(_plan([["update"]], {"url": ["no-op"]}))
+        )
+
 
 class TestVersionCheck(unittest.TestCase):
     def test_supported_major_passes(self):

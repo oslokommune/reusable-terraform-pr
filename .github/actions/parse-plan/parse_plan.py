@@ -16,10 +16,29 @@ import argparse
 import json
 import sys
 
+# The verbs each classification tolerates, for resource and output changes
+NO_CHANGES = {
+    "actions": {"no-op", "read"},
+    "output_actions": {"no-op"},
+}
+ADDITIVE = {
+    "actions": {"no-op", "read", "create"},
+    "output_actions": {"no-op", "create"},
+}
+NON_DESTRUCTIVE = {
+    "actions": {"no-op", "read", "create", "update"},
+    "output_actions": {"no-op", "create", "update"},
+}
+
+
+def only_allowed_actions(actions: set, output_actions: set, allowed: dict) -> bool:
+    # <= on sets is "subset of": every verb seen is tolerated
+    return actions <= allowed["actions"] and output_actions <= allowed["output_actions"]
 
 def classify(plan: dict) -> str:
-    """Checks least severe first; the first tier that covers every verb in
-    the plan wins. Anything not covered is the catch-all "any-changes".
+    """Checks least severe first: a plan classifies as the first category
+    that tolerates every verb in it. Anything else is the catch-all
+    "any-changes".
     """
     # Every action verb in the plan; a replace contributes both "delete" and "create"
     actions = {
@@ -33,14 +52,14 @@ def classify(plan: dict) -> str:
         for verb in change["actions"]
     }
 
-    # NOTE: Order matters: tiers are nested, least severe tier is checked first
-    if actions <= {"no-op", "read"} and output_actions <= {"no-op"}:
+    # NOTE: Order matters: least severe first
+    if only_allowed_actions(actions, output_actions, NO_CHANGES):
         return "no-changes"
 
-    if actions <= {"no-op", "read", "create"} and output_actions <= {"no-op", "create"}:
+    if only_allowed_actions(actions, output_actions, ADDITIVE):
         return "additive"
 
-    if actions <= {"no-op", "read", "create", "update"} and output_actions <= {"no-op", "create", "update"}:
+    if only_allowed_actions(actions, output_actions, NON_DESTRUCTIVE):
         return "non-destructive"
 
     # Single Catch all: deletes, forgets, and any verb we do not know
@@ -70,8 +89,8 @@ if __name__ == "__main__":
     except (OSError, json.JSONDecodeError) as e:
         sys.exit(f"Could not read plan: {e}")
 
-    # An unsupported plan format means this parser is outdated: fail instead of guessing
     if not verify_version(plan):
+    # An unsupported plan format means this parser is outdated: fail instead of guessing
         sys.exit(f"Unsupported format_version {plan.get('format_version')!r}, update parse-plan")
 
     print(classify(plan))
