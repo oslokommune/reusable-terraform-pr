@@ -43,7 +43,7 @@ def classify(plan: dict) -> str:
     if actions <= {"no-op", "read", "create", "update"} and output_actions <= {"no-op", "create", "update"}:
         return "non-destructive"
 
-    # Single Catch all: deletes, forgets, and any verb we do not know
+    # Catch all: deletes, forgets, and any verb we do not know
     return "any-changes"
 
 def verify_version(plan: dict, supported_major: str = "1") -> bool:
