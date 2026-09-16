@@ -357,7 +357,7 @@ jobs:
           terraform show "$PLAN_FILE"
 
       # The plan as JSON, for classification
-      - name: Show Terraform plan as JSON
+      - name: Store Terraform plan as JSON
         id: plan-json
         if: steps.plan.outcome == 'success'
         continue-on-error: true
