@@ -144,8 +144,8 @@ class TestRealPlans(unittest.TestCase):
         "dev-site-cdn-resource-moved.json": "no-changes",
         "dev-site-cdn-data-new-output.json": "additive",
         "dev-site-cdn-output-updated.json": "non-destructive",
-        "dev-cicd-common-import-with-update.json": "non-destructive",
-        "dev-cicd-common-role-replaced.json": "any-changes",
+        "dev-site-cdn-import-with-update.json": "non-destructive",
+        "dev-site-cdn-data-param-replaced.json": "any-changes",
         "dev-site-cdn-resource-removed.json": "any-changes",
     }
 
