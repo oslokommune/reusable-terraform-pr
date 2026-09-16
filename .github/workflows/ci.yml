@@ -20,7 +20,7 @@ jobs:
 
   release-please:
     name: Run release-please
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs:
       - test-parse-plan
     runs-on: ubuntu-latest
