@@ -135,6 +135,7 @@ Policies name the most severe kind of change they tolerate:
 - `non-destructive` - also allow changes in place; nothing is destroyed, replaced or removed
 - `any-changes` - automerge regardless of plan changes
 
+For exact logic, see the [`classify()`](.github/actions/parse-plan/parse_plan.py) function.
 ```yaml
 name: "Terraform PR"
 
