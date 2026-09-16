@@ -136,6 +136,8 @@ jobs:
             }}
           ignored-stacks: ${{ inputs.ignored-stacks }}
 
+
+
       - name: Warn on no stacks found
         if: ${{ !fromJSON(steps.determine.outputs.all-stacks)[0] }}
         run: |
@@ -309,12 +311,24 @@ jobs:
       - name: Extract Terraform version
         id: v
         working-directory: ${{ matrix.stack }}
-        run: ls -lah; echo "TERRAFORM_VERSION=$(grep required_version *.tf | sed -E 's/[^"]+"([^"]+)"+/\1/')" >> "$GITHUB_OUTPUT"
+        env:
+          BLACK_LISTED_VERSION: ${{ vars.TERRAFORM_BLACKLISTED_VERSIONS }}
+        run: |
+          required_version = ">= 1.10.0, != 1.15.2"
+          # Example: TERRAFORM_VERSION=">= 1.10.0"
+          # Todo remove from github output
+          ls -lah; echo "TERRAFORM_VERSION=$(grep required_version *.tf | sed -E 's/[^"]+"([^"]+)"+/\1/')" >> "$GITHUB_OUTPUT"
+          
+          # Append any black-listed terraform versions
+          
+          # Example: TERRAFORM_VERSION=">= 1.10.0, != 1.15.2"
+          # TODO: code
+          
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85 # v4.0.0
         with:
-          terraform_version: ${{ steps.v.outputs.TERRAFORM_VERSION }}
+          terraform_version: ${{ steps.v2.outputs.TERRAFORM_VERSION }}
 
       - name: Create directory for Terraform cache
         run: mkdir -p "$TF_PLUGIN_CACHE_DIR"
