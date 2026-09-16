@@ -1,0 +1,73 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.16.1",
+  "resource_changes": [
+    {
+      "address": "aws_dynamodb_table.terraform_state_lock",
+      "mode": "managed",
+      "type": "aws_dynamodb_table",
+      "name": "terraform_state_lock",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "module.s3_bucket.aws_s3_bucket.this",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "this",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "module.s3_bucket.aws_s3_bucket_ownership_controls.this",
+      "mode": "managed",
+      "type": "aws_s3_bucket_ownership_controls",
+      "name": "this",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "module.s3_bucket.aws_s3_bucket_public_access_block.this",
+      "mode": "managed",
+      "type": "aws_s3_bucket_public_access_block",
+      "name": "this",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "module.s3_bucket.aws_s3_bucket_server_side_encryption_configuration.this",
+      "mode": "managed",
+      "type": "aws_s3_bucket_server_side_encryption_configuration",
+      "name": "this",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "module.s3_bucket.aws_s3_bucket_versioning.this",
+      "mode": "managed",
+      "type": "aws_s3_bucket_versioning",
+      "name": "this",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    }
+  ],
+  "output_changes": {}
+}

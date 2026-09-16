@@ -1,0 +1,129 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.16.1",
+  "resource_changes": [
+    {
+      "address": "aws_lambda_invocation.deployment[0]",
+      "mode": "managed",
+      "type": "aws_lambda_invocation",
+      "name": "deployment",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_route53_record.website",
+      "mode": "managed",
+      "type": "aws_route53_record",
+      "name": "website",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_route53_record.website_ipv6",
+      "mode": "managed",
+      "type": "aws_route53_record",
+      "name": "website_ipv6",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_s3_bucket_policy.cloudfront_access_moved",
+      "previous_address": "aws_s3_bucket_policy.cloudfront_access",
+      "mode": "managed",
+      "type": "aws_s3_bucket_policy",
+      "name": "cloudfront_access_moved",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "aws_ssm_parameter.artifact[0]",
+      "mode": "managed",
+      "type": "aws_ssm_parameter",
+      "name": "artifact",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "module.acm.aws_acm_certificate.this[0]",
+      "mode": "managed",
+      "type": "aws_acm_certificate",
+      "name": "this",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "module.acm.aws_acm_certificate_validation.this[0]",
+      "mode": "managed",
+      "type": "aws_acm_certificate_validation",
+      "name": "this",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "module.acm.aws_route53_record.validation[0]",
+      "mode": "managed",
+      "type": "aws_route53_record",
+      "name": "validation",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "module.cloudfront.aws_cloudfront_distribution.this[0]",
+      "mode": "managed",
+      "type": "aws_cloudfront_distribution",
+      "name": "this",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    },
+    {
+      "address": "module.cloudfront.aws_cloudfront_origin_access_control.this[\"sandbox-finn-dev_some-site\"]",
+      "mode": "managed",
+      "type": "aws_cloudfront_origin_access_control",
+      "name": "this",
+      "change": {
+        "actions": [
+          "no-op"
+        ]
+      }
+    }
+  ],
+  "output_changes": {
+    "artifact_tag": {
+      "actions": [
+        "no-op"
+      ]
+    },
+    "service_url": {
+      "actions": [
+        "no-op"
+      ]
+    }
+  }
+}

@@ -1,0 +1,27 @@
+name: "Parse Terraform plan"
+description: "Classify a Terraform plan into a change severity: no-changes < additive < non-destructive < any-changes. A plan that cannot be classified is treated as 'any-changes'."
+
+inputs:
+  plan-json-path:
+    description: "Path to the output of `terraform show -json <planfile>`"
+    required: true
+
+outputs:
+  change-severity:
+    description: "The most severe kind of change in the plan: 'no-changes', 'additive', 'non-destructive' or 'any-changes'"
+    value: ${{ steps.parse.outputs.change-severity }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Parse
+      id: parse
+      shell: bash --noprofile --norc -euo pipefail {0}
+      env:
+        PLAN_JSON_PATH: ${{ inputs.plan-json-path }}
+      run: |
+        if ! change_severity="$(python3 "$GITHUB_ACTION_PATH/parse_plan.py" --plan-json-path "$PLAN_JSON_PATH")"; then
+          echo "::error title=Parse plan::could not parse the plan JSON - see the step log"
+          exit 1
+        fi
+        echo "change-severity=$change_severity" >> "$GITHUB_OUTPUT"
