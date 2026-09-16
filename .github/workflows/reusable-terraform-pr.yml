@@ -356,7 +356,6 @@ jobs:
         run: |
           terraform show "$PLAN_FILE"
 
-      # The plan as JSON, for classification
       - name: Store Terraform plan as JSON
         id: plan-json
         if: steps.plan.outcome == 'success'
