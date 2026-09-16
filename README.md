@@ -63,7 +63,7 @@ jobs:
 
 - `success`: whether `terraform plan` succeeded for the stack.
 - `hasChanges`: Terraform's own verdict on whether the plan is non-empty, from its exit code. `null` when the plan failed, since drift is then unknown.
-- `changeSeverity`: the most severe kind of change the plan contains: `no-changes` < `additive` < `non-destructive` < `any-changes`. `null` when the stack was not classified (e.g. the plan or the classification failed); automerge then assumes the worst and treats it as `any-changes`.
+- `changeSeverity`: the most severe kind of change the plan contains: `no-changes` < `additive` < `non-destructive` < `any-changes`. `null` when the stack was not classified (e.g. the plan or the classification failed); automerge then assumes the worst and treats it as `any-changes`. See [With automerge](#with-automerge) for what each severity covers.
 
 `hasChanges` and `changeSeverity` are derived independently: an import- or move-only plan is non-empty (`hasChanges: true`) yet safe (`changeSeverity: "no-changes"`).
 
@@ -128,7 +128,7 @@ When `pr-automerge` is enabled, Renovate PRs are evaluated for automerge eligibi
 
 `pr-automerge-rules` is a JSON array of rules. Each rule has a `pattern` (glob) and optional policies for `major`, `minor`, and `patch` update types. First matching pattern wins.
 
-Policies name the most severe kind of change they tolerate:
+Policies name the most severe `changeSeverity` they tolerate; a plan's severity is the most severe change it contains:
 - `never` - never automerge this update type
 - `no-changes` - only automerge if the Terraform plan has no changes (default)
 - `additive` - also allow plans that only add: new resources and new outputs
