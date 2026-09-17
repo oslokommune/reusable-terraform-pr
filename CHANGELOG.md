@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.0](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.8.0...v1.9.0) (2026-09-17)
+
+
+### Features
+
+* derive has-changes from Terraform's plan exit code instead of the summary text ([fa55203](https://github.com/oslokommune/reusable-terraform-pr/commit/fa5520337a20298baa111fa6004641f7deb4ea52))
+* rank Terraform plan changes by severity for granular automerge rules ([fa55203](https://github.com/oslokommune/reusable-terraform-pr/commit/fa5520337a20298baa111fa6004641f7deb4ea52))
+
 ## [1.8.0](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.7.0...v1.8.0) (2026-09-04)
 
 

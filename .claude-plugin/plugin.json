@@ -1,6 +1,6 @@
 {
   "name": "reusable-terraform-pr",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Skills for repositories that run Terraform plans with the oslokommune/reusable-terraform-pr workflow.",
   "author": {
     "name": "Oslo kommune",
