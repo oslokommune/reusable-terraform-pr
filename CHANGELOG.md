@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.9.0](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.8.0...v1.9.0) (2026-09-17)
+
+Automerge rules can now name how severe a Terraform plan's changes may be,
+per update type: `never` < `no-changes` (default) < `additive` <
+`non-destructive` < `any-changes`.
+
+```yaml
+pr-automerge-rules: |
+  [
+    {"pattern": "**/prod/**", "major": "never",      "minor": "additive",    "patch": "non-destructive"},
+    {"pattern": "**",         "major": "no-changes", "minor": "any-changes", "patch": "any-changes"}
+  ]
+```
+
+Existing rules keep working: the old policy values are unchanged, and
+unspecified update types still default to `no-changes`.
+
+The `stack-results` output gains `changeSeverity` - the most severe kind of
+change in the stack's plan, `null` when the stack was not classified (automerge
+then assumes the worst). `hasChanges` is now Terraform's own verdict from
+`-detailed-exitcode`; an import- or move-only plan has changes but severity
+`no-changes`. See [stack results](https://github.com/oslokommune/reusable-terraform-pr#stack-results)
+and [With automerge](https://github.com/oslokommune/reusable-terraform-pr#with-automerge)
+in the README.
+
+### Features
+
+* derive has-changes from Terraform's plan exit code instead of the summary text ([fa55203](https://github.com/oslokommune/reusable-terraform-pr/commit/fa5520337a20298baa111fa6004641f7deb4ea52))
+* rank Terraform plan changes by severity for granular automerge rules ([fa55203](https://github.com/oslokommune/reusable-terraform-pr/commit/fa5520337a20298baa111fa6004641f7deb4ea52))
+
 ## [1.8.0](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.7.0...v1.8.0) (2026-09-04)
 
 
