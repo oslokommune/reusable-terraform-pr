@@ -767,8 +767,7 @@ jobs:
             && needs.summarize.outputs.success == 'true'
             && github.event.pull_request.commits == 1
           }}
-        # TODO: re-pin to the evaluate-automerge release tag once it is cut
-        uses: oslokommune/composite-actions/evaluate-automerge@886bc5215121bd07952a688f45f7fcc5ea2c8ff3
+        uses: oslokommune/composite-actions/evaluate-automerge@1f66ad834f404c0de6e488d587bb84a7473dfdc5 # evaluate-automerge-v1.1.0
         with:
           rules: ${{ inputs.pr-automerge-rules }}
           stack-results: ${{ needs.summarize.outputs.stack-results }}
