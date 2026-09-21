@@ -786,6 +786,10 @@ jobs:
           author="$(echo "$non_merge" | jq --raw-output 'first.author.login // ""')"
 
           if [ "$count" = "1" ] && [ "$author" = "kjoremiljo-renovate[bot]" ]; then
+            # evaluate-automerge reads the upgrade summary from this commit. It
+            # defaults to the PR head, which after an "Update branch" click is
+            # the merge commit - whose message carries no summary.
+            echo "summary-commit-sha=$(echo "$non_merge" | jq --raw-output 'first.sha')" >> "$GITHUB_OUTPUT"
             echo "only-renovate-changes=true" >> "$GITHUB_OUTPUT"
           else
             echo "only-renovate-changes=false" >> "$GITHUB_OUTPUT"
@@ -809,6 +813,7 @@ jobs:
         with:
           rules: ${{ inputs.pr-automerge-rules }}
           stack-results: ${{ needs.summarize.outputs.stack-results }}
+          summary-commit-sha: ${{ steps.commits.outputs.summary-commit-sha }}
 
       # Runs whether or not the steps above did, so a PR that no longer
       # qualifies loses the label. '!cancelled()' as on the job itself.
