@@ -760,7 +760,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       # Renovate's own commit is the only thing we merge unreviewed, so a PR
-      # someone has added to must not automerge.
+      # someone has added to must not automerge. The merging side applies the
+      # same rule before it merges, in oslokommune/golden-path-renovate
+      # ('internal/automerge.py'), so keep the two in sync.
       - name: Check that only Renovate changed the PR
         id: commits
         if: >-
