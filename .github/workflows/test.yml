@@ -1,0 +1,108 @@
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Smoke test reusable workflow under act
+    runs-on: ubuntu-24.04
+    services:
+      moto:
+        image: motoserver/moto:5.2.1@sha256:fe6575dcd878842124f05d20e4ffde2d1126e1e38ad03e196353b9e53649bcdf
+        ports:
+          - 5000:5000
+      wiremock:
+        image: wiremock/wiremock:3.13.2@sha256:fd27e46090916e85326229e5102ee169ae729059f3374549615bd20a35fee1f2
+        # Bind to port 80 so `gh api` (which hardcodes http://api.<host>/
+        # for the special `github.localhost` hostname) can reach it
+        # without explicit port handling.
+        ports:
+          - 80:8080
+    env:
+      ACT_VERSION: v0.2.89
+      ACT_SHA256: 0191d6f1f3b716b5c55820032605d05fc3c1cdbf581ebeff655019e5dd1524c0
+      # The "gh" variant adds the gh CLI on top of the minimal "act"
+      # base. Smallest catthehacker image that still has gh, which the
+      # cleanup step shells out to. Other tools (terraform, etc.) are
+      # installed by the workflow's setup-* actions on demand.
+      ACT_PLATFORM_IMAGE: catthehacker/ubuntu:gh-24.04-20260529@sha256:67cc0297bfcd9bf99ac1d925c157fc7ce22a970a58aa201be3fe5d7b96c889c6
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Wait for mock services
+        run: |
+          timeout 60 bash -c 'until curl -sf http://localhost:5000/moto-api/; do sleep 1; done'
+          timeout 60 bash -c 'until curl -sf http://localhost:80/__admin/health; do sleep 1; done'
+
+      - name: Pre-create Terraform state bucket in moto
+        env:
+          AWS_ACCESS_KEY_ID: testing
+          AWS_SECRET_ACCESS_KEY: testing
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_ENDPOINT_URL: http://localhost:5000
+        run: aws s3 mb s3://test-tfstate
+
+      - name: Seed WireMock with GitHub API stubs
+        run: |
+          curl --fail-with-body -sS -X POST -H "Content-Type: application/json" \
+            --data @testdata/fixtures/comments-empty.json \
+            http://localhost:80/__admin/mappings/import
+
+      - name: Install act
+        env:
+          ACT_TARBALL: act_Linux_x86_64.tar.gz
+        run: |
+          tarball="/tmp/$ACT_TARBALL"
+          curl -fsSL "https://github.com/nektos/act/releases/download/${ACT_VERSION}/${ACT_TARBALL}" -o "$tarball"
+          echo "${ACT_SHA256}  ${tarball}" | sha256sum -c -
+          sudo tar -xzf "$tarball" -C /usr/local/bin act
+          act --version
+
+      - name: Run reusable workflow under act
+        env:
+          # Real token so act can clone referenced actions (including the
+          # internal composite-actions repo). Runtime GitHub API calls
+          # from inside the workflow are routed to WireMock via
+          # GITHUB_API_URL and GH_HOST. The fake event payload points at
+          # a nonexistent repo, so even a leak would fail closed.
+          ACT_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+        run: |
+          act pull_request \
+            -W testdata/test-caller.yml \
+            -e testdata/events/pull_request.json \
+            --platform ubuntu-latest="${ACT_PLATFORM_IMAGE}" \
+            --platform ubuntu-24.04="${ACT_PLATFORM_IMAGE}" \
+            --container-options "--add-host=api.github.localhost:host-gateway --add-host=host.docker.internal:host-gateway" \
+            --artifact-server-path /tmp/act-artifacts \
+            --env "GITHUB_API_URL=http://api.github.localhost" \
+            --env "GH_HOST=github.localhost" \
+            --env "GITHUB_REPOSITORY=act-test/act-test-fixture" \
+            --env "GITHUB_REPOSITORY_OWNER=act-test" \
+            --env "AWS_ENDPOINT_URL=http://host.docker.internal:5000" \
+            --env "AWS_ACCESS_KEY_ID=testing" \
+            --env "AWS_SECRET_ACCESS_KEY=testing" \
+            --env "AWS_DEFAULT_REGION=us-east-1" \
+            --secret "GITHUB_TOKEN=${ACT_GITHUB_TOKEN}" \
+            2>&1 | tee /tmp/act.log
+
+      - name: Print WireMock request log
+        if: always()
+        run: |
+          echo "=== WireMock request log ==="
+          curl -sf http://localhost:80/__admin/requests | jq '.requests[] | {method: .request.method, url: .request.url}'
+          echo "=== /__admin/requests/count ==="
+          curl -sf http://localhost:80/__admin/requests/count | jq
+
+      - name: Print moto state
+        if: always()
+        run: |
+          echo "=== moto data ==="
+          curl -sf "http://localhost:5000/moto-api/data.json" | jq '. | keys' || true

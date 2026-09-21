@@ -1,0 +1,48 @@
+{
+  "mappings": [
+    {
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/repos/act-test/act-test-fixture/issues/1/comments"
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": []
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "urlPathPattern": "/repos/act-test/act-test-fixture/issues/1/comments"
+      },
+      "response": {
+        "status": 201,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": 1234567890,
+          "node_id": "IC_test",
+          "url": "http://localhost:8080/repos/act-test/act-test-fixture/issues/comments/1234567890",
+          "html_url": "http://localhost:8080/oslokommune/reusable-terraform-pr/issues/1#issuecomment-1234567890",
+          "body": "stubbed",
+          "user": { "login": "github-actions[bot]" }
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "PATCH",
+        "urlPathPattern": "/repos/act-test/act-test-fixture/issues/comments/[0-9]+"
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": 1234567890,
+          "body": "stubbed-updated",
+          "user": { "login": "github-actions[bot]" }
+        }
+      }
+    }
+  ]
+}
