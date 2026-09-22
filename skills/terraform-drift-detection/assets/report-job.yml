@@ -14,67 +14,59 @@
     runs-on: ubuntu-24.04
     steps:
       - name: Fail the run on drift or a failed plan
-        shell: bash
+        # The runner has Node preinstalled, so the step runs as a Node script.
+        shell: node {0}
         env:
           # JSON object from stack path to {success, hasChanges}. hasChanges is
           # null when the plan failed.
           STACK_RESULTS: ${{ needs.plan.outputs.stack-results }}
-          # Stacks whose plan always has changes, so their changes are not
-          # drift. They are still planned and shown in the summary. One bash
-          # glob per line, matched against the stack path. Say why each stack
-          # always has changes, so the entry can be removed once the cause is
-          # fixed. A failed plan in one of these stacks is still reported.
+          # JSON array of rules for stacks that should not fail the run. Each
+          # rule has a type, a glob pattern matched against the stack path, and
+          # a reason. The stacks are still planned and shown in the summary.
+          #
+          # - "drift": the plan always has changes, so its changes are not
+          #   drift. A failed plan in the stack is still reported.
+          # - "failure": the plan is known to fail, so the failure is not
+          #   reported. Changes in the stack cannot be seen until it plans
+          #   again.
+          #
+          # The reason says why the rule exists, so it can be removed once the
+          # cause is fixed. The step reports rules that ignored nothing.
           #
           # Example:
-          #   # The ECS desired count is changed by autoscaling outside Terraform.
-          #   stacks/*/app-hello-world
-          EXPECTED_CHANGES: |
+          #   [
+          #     {"type": "drift", "pattern": "stacks/*/app-hello-world", "reason": "Autoscaling changes the ECS desired count outside Terraform."},
+          #     {"type": "failure", "pattern": "stacks/dev/legacy", "reason": "The pinned provider no longer accepts the Lambda runtime."}
+          #   ]
+          IGNORED_STACKS: |
+            []
         run: |
-          if [ -z "$STACK_RESULTS" ]; then
-            echo "::warning title=Nothing planned::No stacks were planned, so drift is unknown. Check the selected stacks."
-            exit 0
-          fi
+          const results = Object.entries(JSON.parse(process.env.STACK_RESULTS || "{}") ?? {})
+          if (results.length === 0) {
+            console.log("::warning title=Nothing planned::No stacks were planned, so drift is unknown. Check the selected stacks.")
+            return
+          }
 
-          patterns="$(echo "$EXPECTED_CHANGES" | sed -E 's/#.*//; s/^[[:space:]]+//; s/[[:space:]]+$//')"
+          // Globs work as in the selected-stacks input: `*` matches within one
+          // path segment, `**` matches across segments, and `{a,b}` matches
+          // the alternatives a and b.
+          const { matchesGlob } = require("node:path")
+          const rules = JSON.parse(process.env.IGNORED_STACKS || "[]")
+          const isIgnored = (stack, type) => rules.some((rule) => rule.type === type && matchesGlob(stack, rule.pattern))
 
-          failed=()
-          for stack in $(echo "$STACK_RESULTS" | jq -r 'to_entries[] | select(.value.success | not) | .key'); do
-            failed+=("$stack")
-          done
+          const failed = [], drifted = [], ignored = []
+          for (const [stack, { success, hasChanges }] of results) {
+            if (!success) (isIgnored(stack, "failure") ? ignored : failed).push(stack)
+            else if (hasChanges) (isIgnored(stack, "drift") ? ignored : drifted).push(stack)
+          }
 
-          drifted=()
-          ignored=()
-          for stack in $(echo "$STACK_RESULTS" | jq -r 'to_entries[] | select(.value.hasChanges) | .key'); do
-            matched="false"
-            while read -r pattern; do
-              [ -n "$pattern" ] || continue
-              # shellcheck disable=SC2053 # the pattern is a glob on purpose
-              if [[ "$stack" == $pattern ]]; then
-                matched="true"
-                break
-              fi
-            done <<< "$patterns"
-            if [ "$matched" = "true" ]; then
-              ignored+=("$stack")
-            else
-              drifted+=("$stack")
-            fi
-          done
+          // A failed plan does not make a drift rule stale: drift is then unknown.
+          const stale = rules.filter((rule) => !results.some(([stack, { success, hasChanges }]) =>
+            matchesGlob(stack, rule.pattern) && (rule.type === "failure" ? !success : hasChanges !== false)))
+          if (stale.length) console.log(`::notice title=Stale ignore rules::These rules ignored nothing: ${stale.map((rule) => `${rule.pattern} (${rule.type})`).join(", ")}. Remove a rule when its cause is fixed.`)
 
-          if [ ${#ignored[@]} -gt 0 ]; then
-            echo "::notice title=Expected changes ignored::Stacks with expected changes: ${ignored[*]}."
-          fi
-
-          status=0
-          if [ ${#failed[@]} -gt 0 ]; then
-            echo "::error title=Plan failed::Stacks that failed to plan, so their drift is unknown: ${failed[*]}. See the logs of the plan jobs."
-            status=1
-          fi
-          if [ ${#drifted[@]} -gt 0 ]; then
-            echo "::error title=Drift detected::Stacks with changes: ${drifted[*]}. See the summary of the plan jobs."
-            status=1
-          fi
-          if [ "$status" -eq 0 ]; then
-            echo "No drift. Every plan succeeded, and every stack with changes is expected to have changes."
-          fi
-          exit "$status"
+          if (ignored.length) console.log(`::notice title=Ignored::Ignored stacks: ${ignored.join(", ")}.`)
+          if (failed.length) console.log(`::warning title=Plan failed::Stacks that failed to plan, so their drift is unknown: ${failed.join(", ")}. See the logs of the plan jobs.`)
+          if (drifted.length) console.log(`::error title=Drift detected::Stacks with changes: ${drifted.join(", ")}. See the summary of the plan jobs.`)
+          if (failed.length || drifted.length) process.exitCode = 1
+          else console.log("No drift and no failed plans, other than the ignored stacks.")
