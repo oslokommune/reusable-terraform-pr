@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.9.0...v1.10.0) (2026-09-28)
+
+
+### Features
+
+* resolve Terraform version using resolve-terraform-version ([#49](https://github.com/oslokommune/reusable-terraform-pr/issues/49)) ([ff1642a](https://github.com/oslokommune/reusable-terraform-pr/commit/ff1642a4f1c82638b90a7c8d02bee12394a685a8))
+
 ## [1.9.0](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.8.0...v1.9.0) (2026-09-17)
 
 Automerge rules can now name how severe a Terraform plan's changes may be,
