@@ -33,21 +33,28 @@ Drift is a plan with changes when the code did not change. On a `schedule` the r
 
    Leave `selected-stacks` as it is. On a `schedule` an empty value plans every stack. A caller that passes `${{ inputs.selected-stacks }}` from `workflow_dispatch` also works, since that input is empty on a schedule. Stacks that must never be planned go in `ignored-stacks`.
 
-4. **Add the report job.** Copy [assets/report-job.yml](assets/report-job.yml) into `jobs:`. Set `needs:` and the `STACK_RESULTS` expression to the id of the job that calls the reusable workflow. Fill `EXPECTED_CHANGES` with the stacks the user names as always having changes, one glob per line with a comment saying why. When the user knows of none, leave the list empty. The first scheduled run lists the stacks with changes, and the user adds the expected ones then.
+4. **Add the report job.** Copy [assets/report-job.yml](assets/report-job.yml) into `jobs:`. Set `needs:` and the `STACK_RESULTS` expression to the id of the job that calls the reusable workflow. The step is a Node script, run with `shell: node {0}`, so the job needs no checkout or setup step.
+
+   Fill `IGNORED_STACKS` with one rule per stack the user names. A rule is a JSON object with three fields:
+   - `type`: `drift` for a stack whose plan always has changes, or `failure` for a stack whose plan is known to fail.
+   - `pattern`: a glob matched against the stack path. `*` matches within one path segment, `**` across segments, and `{a,b}` matches either alternative, as in `selected-stacks`.
+   - `reason`: why the rule exists, so it can be removed once the cause is fixed.
+
+   When the user knows of none, leave the array empty. The first scheduled run lists the stacks with changes and failed plans, and the user adds rules then.
 
 5. **Check the workflow.** Run `actionlint` on the file when it is installed. Confirm each of these in the file:
    - `on.schedule` has a cron entry.
    - The report job has `if: ${{ !cancelled() && github.event_name == 'schedule' }}`.
    - `needs` names the plan job, and `STACK_RESULTS` reads that job's `stack-results` output.
-   - Every line in `EXPECTED_CHANGES` is a glob or a comment.
+   - `IGNORED_STACKS` is a JSON array, and every rule has `type` set to `drift` or `failure`, a `pattern`, and a `reason`. Check it with `jq` or `node -e`.
 
 6. **Tell the user what happens next.**
    - Schedules run from the default branch, so the change takes effect once merged.
    - GitHub sends failure notifications for a scheduled run to the user who last changed the cron line.
    - In a public repository GitHub disables the schedule after 60 days without commits.
+   - The report job fails the run on drift or a failed plan, and prints a notice for rules that ignored nothing. Remove those rules.
    - The report job runs only on `schedule`. To see stacks with changes before the first scheduled run, and the workflow has `workflow_dispatch`, run `gh workflow run <file>` and read the plan summary in the run.
 
 ## Reference
 
 - [Scheduled drift detection](https://github.com/oslokommune/reusable-terraform-pr#scheduled-drift-detection) in the README describes the outputs the report job reads.
-- [pirates-iac](https://github.com/oslokommune/pirates-iac/blob/main/.github/workflows/terraform-pr.yml) is a complete caller workflow with the schedule and the report job.
