@@ -120,7 +120,7 @@ The reusable workflow only plans. A `report` job in the caller, run on `schedule
 The report job does not depend on the plan job succeeding, so one broken stack does not hide drift in the others. Stacks that always have changes, such as a service scaled outside Terraform, are listed in the report job as expected changes and skipped. They are still planned and shown in the summary. Use `ignored-stacks` for stacks that should not be planned at all.
 
 > [!TIP]
-> [pirates-iac](https://github.com/oslokommune/pirates-iac/blob/main/.github/workflows/terraform-pr.yml) has a complete workflow with the `schedule` trigger and the report job. Copy it and adjust the list of expected changes, or let an agent do it with the [`terraform-drift-detection` skill](#agent-plugin).
+> [`report-job.yml`](skills/terraform-drift-detection/assets/report-job.yml) has a complete report job. Copy it and adjust the list of expected changes, or let an agent do it with the [`terraform-drift-detection` skill](#agent-plugin).
 
 ### With automerge
 
