@@ -1,0 +1,10 @@
+{
+  "dev": {
+    "defaultRegion": "eu-west-1",
+    "planRoleArn": "arn:aws:iam::000000000000:role/unused-in-hermetic-tests"
+  },
+  "prod": {
+    "defaultRegion": "eu-west-1",
+    "planRoleArn": "arn:aws:iam::000000000000:role/unused-in-hermetic-tests"
+  }
+}
