@@ -1,0 +1,10 @@
+{
+  "dev": {
+    "defaultRegion": "us-east-1",
+    "planRoleArn": "arn:aws:iam::123456789012:role/test-plan"
+  },
+  "prod": {
+    "defaultRegion": "us-east-1",
+    "planRoleArn": "arn:aws:iam::210987654321:role/test-plan"
+  }
+}
