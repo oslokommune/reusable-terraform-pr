@@ -271,9 +271,7 @@ jobs:
       fail-fast: false
       matrix:
         stack: ${{ fromJSON(needs.determine-changed-stacks.outputs.all-stacks) }}
-      # Each plan job creates a PR comment on its first run for a stack. GitHub
-      # allows about 80 comment creates per minute per workflow (secondary rate
-      # limit), and a blocked create fails the job. Updates are not limited.
+      # Limits how fast plan jobs create PR comments. See the "max-parallel" input.
       max-parallel: ${{ inputs.max-parallel }}
     runs-on: ubuntu-24.04
     permissions:
