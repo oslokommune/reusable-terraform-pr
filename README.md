@@ -40,6 +40,7 @@ jobs:
 | `ignored-stacks`     | string  | `""`            | Comma/newline-delimited list of stack patterns to always ignore.                                                                                                   |
 | `pr-automerge`       | boolean | `false`         | Whether to evaluate Renovate PRs for automerge eligibility based on upgrade type and Terraform plan results.                                                       |
 | `pr-automerge-rules` | string  | `[]`            | JSON array of rules with pattern matching and per-update-type policies. Only used when `pr-automerge` is enabled. See [automerge](#with-automerge) for details.    |
+| `max-parallel`       | number  | `40`            | Maximum number of plan jobs that run at the same time. Keeps new PRs with many stacks below GitHub's limit of about 80 new PR comments per minute.                 |
 
 ### Outputs
 
