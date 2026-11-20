@@ -27,6 +27,11 @@ on:
         default: "[]"
         description: "Only used when pr-automerge is enabled. JSON array of rules with pattern matching and per-update-type policies. Each rule: {pattern, major?, minor?, patch?}. Policies name the most severe 'changeSeverity' value they tolerate: 'never' < 'no-changes' < 'additive' < 'non-destructive' < 'any-changes'. First matching pattern wins. Unspecified types default to 'no-changes'."
         required: false
+      max-parallel:
+        type: number
+        default: 40
+        description: "Maximum number of plan jobs that run at the same time. Each plan job creates a PR comment the first time it plans a stack on a PR, and GitHub blocks a workflow that creates more than about 80 comments per minute (secondary rate limit). The default keeps new PRs with many stacks below that limit. Lower it if plan jobs fail with 'You have exceeded a secondary rate limit'."
+        required: false
     secrets:
       ssh-private-key:
         description: "One or more deploy keys that grants read access to neccesary repositories, e.g. Terraform modules in golden-path-iac"
@@ -266,6 +271,10 @@ jobs:
       fail-fast: false
       matrix:
         stack: ${{ fromJSON(needs.determine-changed-stacks.outputs.all-stacks) }}
+      # Each plan job creates a PR comment on its first run for a stack. GitHub
+      # allows about 80 comment creates per minute per workflow (secondary rate
+      # limit), and a blocked create fails the job. Updates are not limited.
+      max-parallel: ${{ inputs.max-parallel }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
