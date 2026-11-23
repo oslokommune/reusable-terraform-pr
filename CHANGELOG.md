@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.10.0...v1.11.0) (2026-11-23)
+
+
+### Features
+
+* add max-parallel input to limit concurrent plan jobs ([#53](https://github.com/oslokommune/reusable-terraform-pr/issues/53)) ([79c3d15](https://github.com/oslokommune/reusable-terraform-pr/commit/79c3d151dd6cf9fdc25dcc59cd275260208a386a))
+
 ## [1.10.0](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.9.0...v1.10.0) (2026-09-28)
 
 
