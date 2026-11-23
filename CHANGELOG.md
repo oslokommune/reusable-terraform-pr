@@ -2,6 +2,20 @@
 
 ## [1.11.0](https://github.com/oslokommune/reusable-terraform-pr/compare/v1.10.0...v1.11.0) (2026-11-23)
 
+Plan jobs are now limited to 40 at a time by default. A new PR that changes
+many stacks could create more than 80 plan comments in a minute. GitHub blocks
+that, and the plan jobs then failed even though the plans succeeded.
+
+You don't need to change anything. Runs with more than 40 stacks take a little
+longer, including scheduled and manual runs. To change the limit, set
+`max-parallel`:
+
+```yaml
+with:
+  max-parallel: 20
+```
+
+Lower it if plan jobs still fail with "You have exceeded a secondary rate limit".
 
 ### Features
 
