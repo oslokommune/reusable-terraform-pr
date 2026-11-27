@@ -25,7 +25,7 @@ on:
       pr-automerge-rules:
         type: string
         default: "[]"
-        description: "Only used when pr-automerge is enabled. JSON array of rules with pattern matching and per-update-type policies. Each rule: {pattern, major?, minor?, patch?}. Policies name the most severe 'changeSeverity' value they tolerate: 'never' < 'no-changes' < 'additive' < 'non-destructive' < 'any-changes'. First matching pattern wins. Unspecified types default to 'no-changes'."
+        description: "Only used when pr-automerge is enabled. JSON array of rules with pattern matching and per-update-type policies. Each rule: {pattern, major?, minor?, patch?, lockFileMaintenance?}. Policies name the most severe 'changeSeverity' value they tolerate: 'never' < 'no-changes' < 'additive' < 'non-destructive' < 'any-changes'. First matching pattern wins. Unspecified types default to 'no-changes'."
         required: false
       max-parallel:
         type: number
