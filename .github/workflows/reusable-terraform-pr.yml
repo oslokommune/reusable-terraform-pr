@@ -25,7 +25,7 @@ on:
       pr-automerge-rules:
         type: string
         default: "[]"
-        description: "Only used when pr-automerge is enabled. JSON array of rules with pattern matching and per-update-type policies. Each rule: {pattern, major?, minor?, patch?}. Policies name the most severe 'changeSeverity' value they tolerate: 'never' < 'no-changes' < 'additive' < 'non-destructive' < 'any-changes'. First matching pattern wins. Unspecified types default to 'no-changes'."
+        description: "Only used when pr-automerge is enabled. JSON array of rules with pattern matching and per-update-type policies. Each rule: {pattern, major?, minor?, patch?, lockFileMaintenance?}. Policies name the most severe 'changeSeverity' value they tolerate: 'never' < 'no-changes' < 'additive' < 'non-destructive' < 'any-changes'. First matching pattern wins. Unspecified types default to 'no-changes'."
         required: false
       max-parallel:
         type: number
@@ -775,7 +775,8 @@ jobs:
             && needs.summarize.outputs.success == 'true'
             && github.event.pull_request.commits == 1
           }}
-        uses: oslokommune/composite-actions/evaluate-automerge@1f66ad834f404c0de6e488d587bb84a7473dfdc5 # evaluate-automerge-v1.1.0
+        # TODO: Pin to evaluate-automerge-v1.2.0 when composite-actions#314 is released. Do not merge before that.
+        uses: oslokommune/composite-actions/evaluate-automerge@3adfc117b194eae2796f66d7c0678c7f53bddb20 # main, unreleased
         with:
           rules: ${{ inputs.pr-automerge-rules }}
           stack-results: ${{ needs.summarize.outputs.stack-results }}

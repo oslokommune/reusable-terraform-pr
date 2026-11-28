@@ -125,9 +125,9 @@ The report job does not depend on the plan job succeeding, so one broken stack d
 
 ### With automerge
 
-When `pr-automerge` is enabled, Renovate PRs are evaluated for automerge eligibility. The workflow parses structured upgrade info from the commit message and checks it against per-stack rules and Terraform plan results. If eligible, the `automerge` label is added, which Renovate picks up to perform the actual merge.
+When `pr-automerge` is enabled, Renovate PRs are evaluated for automerge eligibility: upgrades of Boilerplate templates, and Terraform lock file maintenance. The workflow parses structured upgrade info from the commit message and checks it against per-stack rules and Terraform plan results. If eligible, the `automerge` label is added, which Renovate picks up to perform the actual merge.
 
-`pr-automerge-rules` is a JSON array of rules. Each rule has a `pattern` (glob) and optional policies for `major`, `minor`, and `patch` update types. First matching pattern wins.
+`pr-automerge-rules` is a JSON array of rules. Each rule has a `pattern` (glob) and optional policies for the update types `major`, `minor` and `patch` (Boilerplate template upgrades), and `lockFileMaintenance` (the weekly refresh of all Terraform lock files). First matching pattern wins. A rule without a policy for an update type uses `no-changes`, so lock file maintenance is automerged when no plan has changes. Set `"lockFileMaintenance": "never"` to always merge it by hand.
 
 Policies name the most severe `changeSeverity` they tolerate; a plan's severity is the most severe change it contains:
 - `never` - never automerge this update type
