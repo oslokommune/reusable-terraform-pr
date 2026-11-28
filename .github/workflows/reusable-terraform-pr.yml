@@ -775,7 +775,8 @@ jobs:
             && needs.summarize.outputs.success == 'true'
             && github.event.pull_request.commits == 1
           }}
-        uses: oslokommune/composite-actions/evaluate-automerge@1f66ad834f404c0de6e488d587bb84a7473dfdc5 # evaluate-automerge-v1.1.0
+        # TODO: Pin to evaluate-automerge-v1.2.0 when composite-actions#314 is released. Do not merge before that.
+        uses: oslokommune/composite-actions/evaluate-automerge@3adfc117b194eae2796f66d7c0678c7f53bddb20 # main, unreleased
         with:
           rules: ${{ inputs.pr-automerge-rules }}
           stack-results: ${{ needs.summarize.outputs.stack-results }}
